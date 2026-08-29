@@ -25,7 +25,10 @@ const getReprItemPathKey = (row: BomRow) =>
   row.itemPath.replace(row.itemCode, row.reprItemCode || row.itemCode);
 
 // Level 列: 階層の深さに応じて左インデントを付けて表示する。
+//   左右整列(alignRows)のプレースホルダ行は空オブジェクトで来るため、renderCell を持つ列は
+//   ここで空表示に落とす(既定の getValue 列は undefined → 空セルになるので対応不要)。
 const renderLevelCell = ({ row }: { row: BomRow }) => {
+  if (!row.levelNo) return null;
   const level = Math.max(row.levelNo, 1);
   return (
     <div className="demo-level-cell" style={{ paddingLeft: `${(level - 1) * 12}px` }}>
@@ -41,15 +44,16 @@ const detailColumn: GridColumn<BomRow> = {
   width: 64,
   pinned: 'right',
   suppressAutoSize: true,
-  renderCell: ({ row }) => (
-    <button
-      type="button"
-      className="demo-detail-button"
-      onClick={() => window.alert(`品目マスタを開く: ${row.itemCode}`)}
-    >
-      品目M
-    </button>
-  ),
+  renderCell: ({ row }) =>
+    row.itemCode ? (
+      <button
+        type="button"
+        className="demo-detail-button"
+        onClick={() => window.alert(`品目マスタを開く: ${row.itemCode}`)}
+      >
+        品目M
+      </button>
+    ) : null,
 };
 
 // 2. 列定義: 利用側の型 T に対する GridColumn をそのまま書く。
@@ -88,16 +92,20 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [showDiffOnly, setShowDiffOnly] = useState(false);
   const [isReprItemMode, setIsReprItemMode] = useState(false);
+  const [alignRows, setAlignRows] = useState(false);
+  const [syncScroll, setSyncScroll] = useState(false);
   const [theme, setTheme] = useState<GridTheme>('light');
   const [enableGridFeatures, setEnableGridFeatures] = useState(false);
 
   // 3. 比較: キーの取り方と差分フィールドを渡すだけ。実効的な「差分のみ」はフック側で導出される。
+  //    alignRows は左右を突き合わせ順の同じ長さに揃える(欠損側はプレースホルダ行)。
   const comparison = useComparison<BomRow>({
     left: leftRows,
     right: rightRows,
     getMatchKey: isReprItemMode ? getReprItemPathKey : getItemPathKey,
     compareFields: COMPARE_FIELDS,
     showDiffOnly,
+    alignRows,
   });
 
   // SpreadsheetGrid の props はそのまま透過できる(ソート / フィルター等の機能もここで有効化)。
@@ -192,6 +200,22 @@ export default function App() {
           <label className="demo-toggle">
             <input
               type="checkbox"
+              checked={alignRows}
+              onChange={(event) => setAlignRows(event.target.checked)}
+            />
+            左右整列
+          </label>
+          <label className="demo-toggle">
+            <input
+              type="checkbox"
+              checked={syncScroll}
+              onChange={(event) => setSyncScroll(event.target.checked)}
+            />
+            スクロール同期
+          </label>
+          <label className="demo-toggle">
+            <input
+              type="checkbox"
               checked={enableGridFeatures}
               onChange={(event) => setEnableGridFeatures(event.target.checked)}
             />
@@ -228,6 +252,7 @@ export default function App() {
           keyColumnKeys={['itemCode']}
           showDiffLabelColumn
           diffLabelColumn={{ title: '変更箇所', width: 130 }}
+          enableScrollSync={syncScroll}
           leftHeader={<PaneHeader info={toRootItemInfo(leftRows)} />}
           rightHeader={<PaneHeader info={toRootItemInfo(rightRows)} />}
           gridProps={gridProps}

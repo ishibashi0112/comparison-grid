@@ -139,6 +139,7 @@ type ComparisonLabels = {
 | `enableRowHighlight` | `boolean` | `true` | `same` 以外の行へ `.cmpg-row-diff` を付与。 |
 | `enableKeyCellHighlight` | `boolean` | `true` | `keyColumnKeys` 列のセル強調。 |
 | `enableFieldCellHighlight` | `boolean` | `true` | `compareFields` 対応列のセル強調。 |
+| `enableScrollSync` | `boolean` | `false` | 左右ペインの**縦**スクロールを同期する(`alignRows` との併用を想定。横は同期しない)。`source: 'user'` のスクロールだけ相手の `setScrollPosition({ top })` へ伝え、`'api'` 由来は無視してループを防ぐ(spreadsheet-grid v0.29.0 のスクロール API)。利用側の `ref` / `onScroll`(`gridProps` / 片側 props)はそのまま透過・合成される。 |
 | `className` / `style` | `string` / `CSSProperties` | — | ルート(`.cmpg-view`)へ。 |
 
 ### `ComparisonPane<T extends object>`
@@ -229,4 +230,4 @@ type ComparisonLabels = {
 
 - マニュアル入力ペイン(編集可能グリッド + 末尾空行維持 + 正規化フック + 送信時検証)。
 - `getComparisonExportData()`(spreadsheet-grid の `getExportData()` と同じ思想。現状は `annotatedLeft` / `annotatedRight` から利用側で整形可能)。
-- 差分ジャンプ(`scrollToRow` を使った次 / 前の差分行への移動)、スクロール同期(左右整列モードは実装済み)。
+- 差分ジャンプ(`scrollToRow` を使った次 / 前の差分行への移動)。左右整列モード(`alignRows`)とスクロール同期(`enableScrollSync`)は実装済み。

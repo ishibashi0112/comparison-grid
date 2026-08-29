@@ -245,6 +245,9 @@ export type ComparisonViewProps<T extends object> = ComparisonHighlightOptions &
     comparison: ComparisonViewModel<T>;
     columns: readonly GridColumn<T>[];
     keyColumnKeys?: readonly string[];
+    /** 左右ペインの縦スクロールを同期する(既定 false)。alignRows との併用を想定。
+     *  source が 'user' のスクロールだけを相手ペインへ伝え、'api' 由来は無視してループを防ぎます。 */
+    enableScrollSync?: boolean;
     leftHeader?: ReactNode;
     rightHeader?: ReactNode;
     /** 両ペイン共通の grid props。 */

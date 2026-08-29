@@ -46,12 +46,24 @@
 7. **`title: ''` の列ヘッダーが `key` にフォールバックする。** ボタン専用列(ss2602 の `__detail`)で空タイトルにすると `__detail` が見出しに出る。空文字は「見出しなし」として扱うか、API_REFERENCE に明記すると親切(デモでは `title: 'マスタ'` で回避)。
 8. **スクロール同期 API(Phase 2 向け)。** 左右整列モードでは 2 グリッドの縦スクロールを同期したい。ハンドルに `getScrollPosition()` / `setScrollPosition({ top, left })`、props に `onScroll` があると実装できる(現状は `scrollToRow` / `scrollToCell` のみ)。
 
-## 5. Phase 2 候補(今回のスコープ外)
+## 5. Phase 2 候補と実装記録
 
-- マニュアル入力ペイン: `ComparisonPane` に `gridProps={{ onRowsChange, createRow, readOnly: false }}` を渡せば編集自体は今でも可能。ライブラリ側で担うなら「末尾空行維持 / 正規化フック / 送信時検証」のヘルパー(`useManualRows`)を hooks に追加する形。
-- `getComparisonExportData()`: `annotatedLeft` / `annotatedRight` + 列定義から `{ columns, rows: { value, text }[][] }` を返す(spreadsheet-grid の `getExportData()` と同形)。差分ラベル列を含める。
+### 実装済み(2026-08-29・spreadsheet-grid v0.29.0 対応後)
+
+- **左右整列モード(`alignRows`)+ スクロール同期(`enableScrollSync`)**。決定事項:
+  - 並び順は**左の行順を基準**に対を作り、左と対にならなかった右行(right-only / キー重複の残り)を右の行順で末尾に置く(LCS のような順序保存はしない。キーの Map 突き合わせと整合する最も単純な規則)。
+  - キー重複で複数行が同じ相手を指す場合、相手は**先に対になった行が消費**し、残りはプレースホルダと組む(左右の行数保存を優先)。
+  - プレースホルダは行ごとに新しいオブジェクト(既定 `{} as T`、`createPlaceholderRow` で差し替え)。差分 Map には載せず(`getDiff` は `undefined`)、`placeholders` の Set(同一性)で判定する。行クラス `.cmpg-row-placeholder` は差分ハイライトと独立で `enableRowHighlight={false}` でも付く。
+  - 「差分のみ」は**対の単位**でフィルタし整列を維持(same の対だけ落ちる)。
+  - `visibleLeft` / `visibleRight` の「フィルタ無しで入力と同一参照」の保証は alignRows OFF のときのみ(§2 の補足)。
+  - スクロール同期は**縦のみ**(列幅・横スクロールはペインごとに独立のため)。`onScroll` の `source: 'user'` だけを相手の `setScrollPosition({ top })` へ伝え、`'api'` 由来は無視してループを防ぐ(提案 8 の想定パターンそのまま)。同期は `ComparisonView` の内部 ref で完結し、利用側の `ref` / `onScroll` は合成して透過。eslint の `react-hooks/refs`(render 中に ref を関数へ渡さない)に合わせ、ハンドル ref は `useScrollSyncGridProps` フック内に閉じ、参照は ref callback / イベントハンドラ内のみ。
+  - デモ(App.tsx)に「左右整列」「スクロール同期」トグルを追加。renderCell を持つ列(Level / 品目M ボタン)はプレースホルダ行で空表示に落とす(既定 getValue 列は undefined → 空セルのため対応不要)。
+
+### 候補(未実装)
+
+- マニュアル入力ペイン: `ComparisonPane` に `gridProps={{ onRowsChange, createRow, readOnly: false }}` を渡せば編集自体は今でも可能。ライブラリ側で担うなら「末尾空行維持 / 正規化フック / 送信時検証」のヘルパー(`useManualRows`)を hooks に追加する形。行の差し替えで選択を維持する場合は `rowKeyGetter`(spreadsheet-grid 既存 prop)を透過すればよい。
+- `getComparisonExportData()`: `annotatedLeft` / `annotatedRight` + 列定義から `{ columns, rows: { value, text }[][] }` を返す(spreadsheet-grid の `getExportData()` と同形)。差分ラベル列を含める。alignRows の対順エクスポートも視野。
 - 差分ジャンプ(`useComparisonNavigation`: `scrollToRow` で次 / 前の差分行へ)。
-- 左右整列モード(`alignRows`): 突き合わせ順に並べ、欠損側にプレースホルダ行を入れる + スクロール同期(提案 7 が前提)。
 - ダークテーマ以外のプリセット(色覚多様性向けの配色)。
 
 ## 6. 環境メモ
