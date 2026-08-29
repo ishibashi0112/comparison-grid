@@ -45,9 +45,12 @@ src/components/comparison-grid/
   logic/compare.ts      純ロジック: 突き合わせ + 差分判定 + ラベル生成(React 非依存)
   logic/alignRows.ts    純ロジック: 左右整列(プレースホルダ行の挿入)
   logic/paneColumns.ts  純ロジック: 列定義 / 行クラスの合成、差分ラベル列
+  logic/exportData.ts   純ロジック: エクスポートデータ生成(getExportData() と同形)
   logic/cx.ts           className 連結
   hooks/useStableValue.ts 参照安定化(浅い構造比較)
-  hooks/useComparison.ts  compare() の React 接続、差分のみフィルタの導出
+  hooks/useComparison.ts  compare() の React 接続、alignRows / 差分のみフィルタの導出
+  hooks/useComparisonNavigation.ts 差分ジャンプ(次 / 前の差分行へスクロール)
+  hooks/useManualRows.ts  マニュアル入力(末尾空行維持 / 正規化 / 送信時検証)
   view/ComparisonPane.tsx 片側 1 ペイン(SpreadsheetGrid ラッパー)
   view/ComparisonView.tsx 2 ペインレイアウト + スクロール同期(enableScrollSync)
   styles.css            .cmpg-* クラス + --cmpg-* トークン(未レイヤー / :where)

@@ -274,6 +274,15 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 
 上書きは `.cmpg-pane { --cmpg-diff-row-bg: ... }`(light)/ `.cmpg-pane .ssg-theme-dark { ... }`(dark)。`:where()` 定義のため読み込み順に依らず勝ちます。
 
+### 配色プリセット(`.cmpg-colors-cvd`)
+
+色覚多様性向けのオプトインプリセット。**利用側が** `.cmpg-view` / `.cmpg-pane`(または任意の祖先)へ `cmpg-colors-cvd` クラスを付与すると:
+
+- 差分行の黄系 → **青系**(light: blue-100 `#dbeafe` / hover blue-200)、強調文字の赤 → **橙系**(orange-800 `#9a3412`。白地でコントラスト比 約 7:1)。ダークは青 α / orange-300 に差し替え。
+- 差分セル(`.cmpg-cell-diff`)に**下線**を追加(色に依らない手掛かり)。
+
+トークンは特異度 0 のため、利用側の `--cmpg-*` 上書きはプリセットにも勝ちます。プレースホルダ行の灰系は共通です。
+
 ### 配布物
 
 - `dist/style.css` — 未レイヤー版(推奨)。
@@ -287,8 +296,6 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 - `alignRows` のプレースホルダ行は既定で `{} as T` です。`row.foo.bar` のような入れ子アクセスをする `getValue` / `renderCell` / `valueFormatter` がある列では `createPlaceholderRow` で安全な行を返してください。
 - グリッドの行グルーピング(`rowGroup`)を有効にした場合、グループ行には差分クラスは付きません(leaf 行のみ)。
 
-## Phase 2(未実装・設計だけ壊さない)
+## Phase 2
 
-- マニュアル入力ペイン(編集可能グリッド + 末尾空行維持 + 正規化フック + 送信時検証)。
-- `getComparisonExportData()`(spreadsheet-grid の `getExportData()` と同じ思想。現状は `annotatedLeft` / `annotatedRight` から利用側で整形可能)。
-- 差分ジャンプ(`scrollToRow` を使った次 / 前の差分行への移動)。左右整列モード(`alignRows`)とスクロール同期(`enableScrollSync`)は実装済み。
+初版時の候補はすべて実装済みです: 左右整列モード(`alignRows`)/ スクロール同期(`enableScrollSync`)/ エクスポート(`getComparisonExportData`)/ 差分ジャンプ(`useComparisonNavigation`)/ マニュアル入力(`useManualRows`)/ 色覚多様性プリセット(`.cmpg-colors-cvd`)。経緯と設計判断は `docs/DESIGN_NOTES.md` を参照。

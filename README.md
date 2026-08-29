@@ -22,7 +22,7 @@ Side-by-side **two-list comparison** for **React 19**, built on top of [`@ishiba
 - **Manual input helper (`useManualRows()`)** — row state for an editable pane: keeps a trailing empty row, normalizes edits, validates on submit; `dataRows` (blanks excluded) feeds `useComparison`.
 - **`ComparisonView` / `ComparisonPane`** — two `SpreadsheetGrid`s with row highlight, key-column highlight for one-sided rows, field-cell highlight for differing values, and an optional auto-inserted diff-label column. You write plain `GridColumn<T>[]`; the library composes its classes with yours.
 - **Every grid feature stays available** — `gridProps` passes `SpreadsheetGridProps<T>` through (sorting, filters, theme, density, context menu, imperative `ref`…). Only `rows` / `columns` / `dataSource` are reserved.
-- **Themeable** — colors and gaps are CSS custom properties (`--cmpg-*`) defined at zero specificity; a dark preset follows `theme="dark"` automatically. Unlayered CSS plus a `style.layer.css` variant for Tailwind v4 cascade layers.
+- **Themeable** — colors and gaps are CSS custom properties (`--cmpg-*`) defined at zero specificity; a dark preset follows `theme="dark"` automatically, and an opt-in color-vision-deficiency preset (`.cmpg-colors-cvd`: blue/orange plus underlined diff cells) is included. Unlayered CSS plus a `style.layer.css` variant for Tailwind v4 cascade layers.
 - TypeScript-first, fully controlled.
 
 ## Installation
@@ -251,7 +251,7 @@ MIT
 - **マニュアル入力ヘルパー(`useManualRows()`)** — 編集可能ペイン用の行 state: 末尾空行の維持 / 変更時の正規化 / 送信時検証。空行を除いた `dataRows` を `useComparison` に渡します。
 - **`ComparisonView` / `ComparisonPane`** — 2 つの `SpreadsheetGrid` に、差分行ハイライト / 片側のみ行のキー列強調 / 差分フィールドセルの強調 / 差分ラベル列(任意)を配線。利用側は素の `GridColumn<T>[]` を書くだけで、ライブラリのクラスは利用側のクラスと合成されます。
 - **グリッドの全機能をそのまま利用可** — `gridProps` で `SpreadsheetGridProps<T>` を透過(ソート / フィルター / テーマ / 密度 / コンテキストメニュー / 命令的 `ref` …)。予約するのは `rows` / `columns` / `dataSource` だけ。
-- **テーマ対応** — 色と余白は特異度 0 で定義した CSS 変数(`--cmpg-*`)。`theme="dark"` に自動追従するダークプリセット付き。未レイヤー CSS と、Tailwind v4 向けの `style.layer.css` の二本立て。
+- **テーマ対応** — 色と余白は特異度 0 で定義した CSS 変数(`--cmpg-*`)。`theme="dark"` に自動追従するダークプリセットに加え、色覚多様性向けのオプトインプリセット(`.cmpg-colors-cvd`: 青 / 橙系 + 差分セル下線)付き。未レイヤー CSS と、Tailwind v4 向けの `style.layer.css` の二本立て。
 - TypeScript ファースト、完全 controlled。
 
 ### インストール

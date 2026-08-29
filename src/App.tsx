@@ -96,6 +96,7 @@ export default function App() {
   const [alignRows, setAlignRows] = useState(false);
   const [syncScroll, setSyncScroll] = useState(false);
   const [theme, setTheme] = useState<GridTheme>('light');
+  const [cvdColors, setCvdColors] = useState(false);
   const [enableGridFeatures, setEnableGridFeatures] = useState(false);
 
   // 3. 比較: キーの取り方と差分フィールドを渡すだけ。実効的な「差分のみ」はフック側で導出される。
@@ -243,6 +244,14 @@ export default function App() {
               <option value="auto">auto</option>
             </select>
           </label>
+          <label className="demo-toggle">
+            <input
+              type="checkbox"
+              checked={cvdColors}
+              onChange={(event) => setCvdColors(event.target.checked)}
+            />
+            色覚多様性配色
+          </label>
           <button
             type="button"
             className="demo-button"
@@ -284,6 +293,7 @@ export default function App() {
         <ComparisonView<BomRow>
           comparison={comparison}
           columns={columns}
+          className={cvdColors ? 'cmpg-colors-cvd' : undefined}
           keyColumnKeys={['itemCode']}
           showDiffLabelColumn
           diffLabelColumn={{ title: '変更箇所', width: 130 }}

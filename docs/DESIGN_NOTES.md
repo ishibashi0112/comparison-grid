@@ -59,12 +59,12 @@
   - スクロール同期は**縦のみ**(列幅・横スクロールはペインごとに独立のため)。`onScroll` の `source: 'user'` だけを相手の `setScrollPosition({ top })` へ伝え、`'api'` 由来は無視してループを防ぐ(提案 8 の想定パターンそのまま)。同期は `ComparisonView` の内部 ref で完結し、利用側の `ref` / `onScroll` は合成して透過。eslint の `react-hooks/refs`(render 中に ref を関数へ渡さない)に合わせ、ハンドル ref は `useScrollSyncGridProps` フック内に閉じ、参照は ref callback / イベントハンドラ内のみ。
   - デモ(App.tsx)に「左右整列」「スクロール同期」トグルを追加。renderCell を持つ列(Level / 品目M ボタン)はプレースホルダ行で空表示に落とす(既定 getValue 列は undefined → 空セルのため対応不要)。
 
-### 候補(未実装)
+### 実装済み(同日・batch 10〜13。これで初版時の Phase 2 候補は全件完了)
 
-- マニュアル入力ペイン: `ComparisonPane` に `gridProps={{ onRowsChange, createRow, readOnly: false }}` を渡せば編集自体は今でも可能。ライブラリ側で担うなら「末尾空行維持 / 正規化フック / 送信時検証」のヘルパー(`useManualRows`)を hooks に追加する形。行の差し替えで選択を維持する場合は `rowKeyGetter`(spreadsheet-grid 既存 prop)を透過すればよい。
-- `getComparisonExportData()`: `annotatedLeft` / `annotatedRight` + 列定義から `{ columns, rows: { value, text }[][] }` を返す(spreadsheet-grid の `getExportData()` と同形)。差分ラベル列を含める。alignRows の対順エクスポートも視野。
-- 差分ジャンプ(`useComparisonNavigation`: `scrollToRow` で次 / 前の差分行へ)。
-- ダークテーマ以外のプリセット(色覚多様性向けの配色)。
+- **`getComparisonExportData()`(batch 10)**: `{ rows, diffs, columns }` を受けて本体の `getExportData()` と同形を返す純関数。差分ラベル列は既定で含める(`insertDiffLabelColumn` を流用)。`text` は本体の**セル表示**の規則(`value == null` は `valueFormatter` を通さず `''`)を採用 — エクスポート実装(formatter 無条件適用)ではなく表示側に合わせたのは、プレースホルダ行の `undefined` を formatter が「undefined 個」等に整形してしまうため。整列済み配列を渡せば対順エクスポート。
+- **差分ジャンプ `useComparisonNavigation`(batch 11)**: 停止位置は「visibleLeft の行順 → 左に無い右行を visibleRight の行順で末尾」(alignRows の対順と同じ規則で、整列表示と順序が一致する)。field-diff の対は 1 停止に重複排除。ハンドル ref は**フックが生成して返す**(`react-hooks/refs` が render 中の ref 引数渡しを禁じるため。`ComparisonView` が利用側 ref を合成するので `enableScrollSync` と共存できる)。範囲外はラップ、表示行が変わると位置リセット。**グリッド側ソート / フィルター適用中は view index がずれる**制約を API_REFERENCE に明記。
+- **`useManualRows`(batch 12)**: 末尾空行維持(既存の空行オブジェクトを再利用して参照を保つ)/ `normalizeRow`(変更不要なら同一参照を返す契約)/ `validateRow`(空行は評価しない)。`rows`(空行込み)をグリッドへ、`dataRows`(空行除外)を `useComparison` へ渡す二層構え。
+- **色覚多様性プリセット `.cmpg-colors-cvd`(batch 13)**: 利用側がクラスを付与するオプトイン方式。黄 / 赤 → 青(blue-100)/ 橙(orange-800)+ 差分セルに**下線**(色に依らない手掛かり)。トークンは特異度 0 で基底より後に定義(基底に勝ち、利用側上書きに負ける)。
 
 ## 6. 環境メモ
 

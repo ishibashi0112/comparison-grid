@@ -92,3 +92,26 @@
 .ssg-body-cell.cmpg-row-placeholder.ssg-body-cell--row-hovered {
   background-color: var(--cmpg-placeholder-row-hover-bg);
 }
+
+/* 色覚多様性向けプリセット: .cmpg-colors-cvd を .cmpg-view / .cmpg-pane(または祖先)に付与すると
+   黄 / 赤の既定を青 / 橙系へ差し替え、差分セルに下線(色に依らない手掛かり)を加える。
+   トークンは特異度 0 で基底より後に定義するため基底に勝ち、利用側の上書きには負ける。 */
+:where(.cmpg-colors-cvd) :where(.cmpg-pane),
+:where(.cmpg-pane.cmpg-colors-cvd) {
+  /* 差分行: Tailwind blue-100 / blue-200。強調文字: orange-800(白地でコントラスト比 約 7:1)。 */
+  --cmpg-diff-row-bg: #dbeafe;
+  --cmpg-diff-row-hover-bg: #bfdbfe;
+  --cmpg-diff-text: #9a3412;
+}
+
+:where(.cmpg-colors-cvd) :where(.cmpg-pane .ssg-theme-dark),
+:where(.cmpg-pane.cmpg-colors-cvd .ssg-theme-dark) {
+  --cmpg-diff-row-bg: rgba(59, 130, 246, 0.16);
+  --cmpg-diff-row-hover-bg: rgba(59, 130, 246, 0.26);
+  --cmpg-diff-text: #fdba74;
+}
+
+:where(.cmpg-colors-cvd) .ssg-body-cell.cmpg-cell-diff {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
