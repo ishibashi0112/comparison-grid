@@ -1,0 +1,92 @@
+{
+  "name": "@ishibashi0112/comparison-grid",
+  "version": "0.1.0",
+  "description": "React 19 製の 2 構成比較コンポーネント。左右のリストをキーで突き合わせ、指定フィールドの差分を @ishibashi0112/spreadsheet-grid 上でハイライト表示します。型・データ・列定義・比較設定を渡すだけで差分表示が組み上がります。",
+  "keywords": [
+    "react",
+    "react19",
+    "grid",
+    "datagrid",
+    "diff",
+    "comparison",
+    "compare",
+    "bom",
+    "spreadsheet",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "Yuki Sakakibara",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ishibashi0112/comparison-grid.git"
+  },
+  "homepage": "https://github.com/ishibashi0112/comparison-grid#readme",
+  "bugs": {
+    "url": "https://github.com/ishibashi0112/comparison-grid/issues"
+  },
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./style.css": "./dist/style.css",
+    "./style.layer.css": "./dist/style.layer.css"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@11.12.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "vp dev",
+    "build": "tsc -b && vp build",
+    "build:lib": "vp build --config vite.lib.config.ts && tsc -p tsconfig.lib.json && node scripts/emit-layer-css.mjs",
+    "build:types": "tsc -p tsconfig.lib.json",
+    "prepublishOnly": "pnpm run build:lib",
+    "lint": "eslint .",
+    "preview": "vp preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck:test": "tsc --noEmit -p tsconfig.vitest.json"
+  },
+  "peerDependencies": {
+    "@ishibashi0112/spreadsheet-grid": ">=0.28.1 <1.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@ishibashi0112/spreadsheet-grid": "^0.28.1",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^24.12.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^10.3.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
+    "jsdom": "^29.1.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.59.2",
+    "vite": "^8.0.12",
+    "vite-plus": "^0.2.4",
+    "vitest": "^4.1.9"
+  }
+}

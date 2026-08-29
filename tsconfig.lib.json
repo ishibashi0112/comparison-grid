@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist",
+    "rootDir": "src/components/comparison-grid"
+  },
+  "include": ["src/components/comparison-grid"],
+  "exclude": [
+    "src/components/comparison-grid/**/*.test.ts",
+    "src/components/comparison-grid/**/*.test.tsx"
+  ]
+}

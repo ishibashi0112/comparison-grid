@@ -1,0 +1,8 @@
+# vite+(vp)のツールチェーンを使うための overrides です(spreadsheet-grid と同構成)。
+#   vp は同梱ツールへフォールバックすると環境パッケージ(jsdom 等)を同梱側から解決できず
+#   DOM 系テストが起動しません。vite を vite-plus-core へエイリアスし、vitest を vp 同梱
+#   バージョンへ pin することで、ツールが一本化され jsdom はプロジェクトの node_modules から
+#   解決されます。vitest の pin は `vp --version` の同梱バージョンと揃えること。
+overrides:
+  vite: npm:@voidzero-dev/vite-plus-core@latest
+  vitest: 4.1.10
