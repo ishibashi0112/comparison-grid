@@ -124,6 +124,31 @@ export type ComparisonResult<T> = {
   hasAnyDiff: boolean;
 };
 
+/** 左右整列モード(alignRows)で対になった 1 行。欠損側にはプレースホルダ行が入ります。 */
+export type ComparisonAlignedPair<T> = {
+  left: T;
+  right: T;
+};
+
+/** 各側の表示配列に挿入されたプレースホルダ行の集合(行オブジェクトの同一性で判定)。 */
+export type ComparisonPlaceholders<T> = {
+  left: ReadonlySet<T>;
+  right: ReadonlySet<T>;
+};
+
+export type AlignComparisonRowsOptions<T> = {
+  /** プレースホルダ行の生成。**呼び出しごとに新しいオブジェクト**を返すこと(同一性で判定するため)。
+   *  既定は空オブジェクト(`{} as T`。`row[key]` アクセスが undefined になり空セルとして描画される)。 */
+  createPlaceholderRow?: (side: ComparisonSide) => T;
+};
+
+/** alignComparisonRows() の戻り値。 */
+export type AlignComparisonRowsResult<T> = {
+  /** 突き合わせ順の対。左の行順を基準に、左に無い右行は右の行順で末尾に並ぶ。 */
+  pairs: ComparisonAlignedPair<T>[];
+  placeholders: ComparisonPlaceholders<T>;
+};
+
 export type UseComparisonOptions<T> = CompareOptions<T> & {
   left: readonly T[];
   right: readonly T[];
