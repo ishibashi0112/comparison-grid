@@ -1,0 +1,144 @@
+/* デモ(ss2602 再現)専用のスタイルです。ライブラリの CSS(styles.css)とは分離しています。 */
+.demo-app {
+  --demo-bg: #f3f4f6;
+  --demo-surface: #ffffff;
+  --demo-text: #111827;
+  --demo-muted: #6b7280;
+  --demo-border: #d1d5db;
+  --demo-primary: #1f2937;
+  min-height: 100vh;
+  padding: 12px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--demo-bg);
+  color: var(--demo-text);
+  font-family: system-ui, 'Segoe UI', Roboto, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  font-size: 14px;
+}
+
+.demo-app--dark {
+  --demo-bg: #111318;
+  --demo-surface: #1b1e26;
+  --demo-text: #e5e7eb;
+  --demo-muted: #9ca3af;
+  --demo-border: #3a3f4b;
+  --demo-primary: #3461c9;
+  color-scheme: dark;
+}
+
+.demo-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--demo-surface);
+  border: 1px solid var(--demo-border);
+}
+
+.demo-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.demo-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.demo-input {
+  width: 120px;
+  padding: 4px 8px;
+  border: 1px solid var(--demo-border);
+  border-radius: 4px;
+  background: var(--demo-surface);
+  color: var(--demo-text);
+  font: inherit;
+}
+
+.demo-button {
+  padding: 4px 12px;
+  border: 1px solid var(--demo-border);
+  border-radius: 4px;
+  background: var(--demo-surface);
+  color: var(--demo-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.demo-button--primary {
+  background: var(--demo-primary);
+  border-color: var(--demo-primary);
+  color: #ffffff;
+}
+
+.demo-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.demo-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.demo-summary {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--demo-muted);
+  font-size: 12px;
+}
+
+.demo-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.demo-pane-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.demo-pane-spec {
+  margin: 0;
+  white-space: nowrap;
+  color: var(--demo-muted);
+}
+
+.demo-level-cell {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.demo-detail-button {
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 3px;
+  background: #e5e7eb;
+  color: #111827;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.demo-detail-button:hover {
+  opacity: 1;
+}
