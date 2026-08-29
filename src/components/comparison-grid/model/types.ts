@@ -258,6 +258,51 @@ export type UseComparisonNavigationResult<T> = {
   goToPreviousDiff: () => void;
 };
 
+/** useManualRows の 1 エラー。rowIndex は rows(グリッド表示配列)上の位置。 */
+export type ManualRowError<T> = {
+  row: T;
+  rowIndex: number;
+  message: string;
+};
+
+export type UseManualRowsOptions<T> = {
+  /** 初期行(既定 `[]`)。末尾空行はフックが維持するため含めなくてよい。 */
+  initialRows?: readonly T[];
+  /** 空行の生成(グリッドの createRow と同じ。**毎回新しいオブジェクト**を返すこと)。 */
+  createRow: () => T;
+  /** 「空行」の判定。末尾空行の維持と dataRows の除外に使う。 */
+  isEmptyRow: (row: T) => boolean;
+  /** 変更時の正規化(トリム等)。**変更が不要なら受け取った row をそのまま返す**こと
+   *  (参照を保つとグリッドの編集状態 / undo と相性がよい)。 */
+  normalizeRow?: (row: T) => T;
+  /** 送信時検証。エラーメッセージを返す(空 / null / undefined で OK)。空行は評価しない。 */
+  validateRow?: (row: T, rowIndex: number) => string | null | undefined;
+  /** 維持する末尾空行数(既定 1)。0 で維持しない(末尾の空行は取り除かれる)。 */
+  trailingEmptyRows?: number;
+};
+
+export type UseManualRowsResult<T> = {
+  /** グリッドへ渡す行(末尾空行込み)。 */
+  rows: readonly T[];
+  /** 空行(途中の空行も含む)を除いた確定行。useComparison の left / right へ。 */
+  dataRows: readonly T[];
+  /** gridProps.onRowsChange へ(正規化 + 末尾空行の維持)。 */
+  onRowsChange: (nextRows: T[]) => void;
+  /** 行の外部差し替え(読み込み / リセット)。末尾空行の維持のみ行う(正規化はしない)。 */
+  setRows: (rows: readonly T[]) => void;
+  /** 全行クリア(空行だけの状態に戻す)。 */
+  clear: () => void;
+  /** validateRow の現在の結果。 */
+  errors: readonly ManualRowError<T>[];
+  /** errors.length === 0(送信可否に)。 */
+  isValid: boolean;
+  /** そのままスプレッドできる編集用 props(`gridProps={{ ...manual.gridProps, readOnly: false }}` 等)。 */
+  gridProps: {
+    onRowsChange: (nextRows: T[]) => void;
+    createRow: () => T;
+  };
+};
+
 /** getComparisonExportData() のオプション。 */
 export type ComparisonExportOptions<T> = {
   /** エクスポートする行(`visibleLeft` / `annotatedLeft.map((e) => e.row)` / 整列済み配列など)。 */

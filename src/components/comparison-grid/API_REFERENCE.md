@@ -158,6 +158,31 @@ type ComparisonLabels = {
 
 **注意**: `scrollToRow` は view index を受け取るため、**グリッド側のソート / フィルター**(`enableSorting` / `enableColumnFilter` 等)を適用中は行位置がずれます。差分ジャンプは比較結果の並びのまま表示している画面で使ってください。
 
+### `useManualRows<T>(options): UseManualRowsResult<T>`
+
+マニュアル入力ペイン(編集可能グリッド)用の行 state ヘルパー。**末尾空行の維持 / 変更時の正規化 / 送信時検証**を担います。`rows`(空行込み)を編集ペインへ、`dataRows`(空行除外)を `useComparison` の `left` / `right` へ渡します。
+
+```tsx
+const manual = useManualRows<Row>({ createRow, isEmptyRow, normalizeRow, validateRow });
+const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
+// 編集側は ComparisonPane を直接使う(rows は比較結果ではなく manual.rows)
+<ComparisonPane side="left" rows={manual.rows} diffs={comparison.leftDiffs} columns={columns}
+  gridProps={{ ...manual.gridProps, readOnly: false }} />
+```
+
+| オプション | 型 | 既定 | 説明 |
+| --- | --- | --- | --- |
+| `initialRows` | `readonly T[]` | `[]` | 初期行(末尾空行は含めなくてよい)。 |
+| `createRow` | `() => T` | (required) | 空行の生成(毎回新しいオブジェクトを返すこと)。 |
+| `isEmptyRow` | `(row: T) => boolean` | (required) | 空行判定(末尾空行の維持 / `dataRows` の除外に使用)。 |
+| `normalizeRow` | `(row: T) => T` | — | 変更時の正規化(トリム等)。**変更不要なら同じ参照を返す**こと。 |
+| `validateRow` | `(row, rowIndex) => string \| null \| undefined` | — | エラーメッセージを返す(空行は評価しない)。 |
+| `trailingEmptyRows` | `number` | `1` | 維持する末尾空行数。`0` で維持しない。 |
+
+戻り値: `rows` / `dataRows` / `onRowsChange`(正規化 + 末尾空行維持。既存の空行オブジェクトは再利用して参照を保つ)/ `setRows`(外部差し替え。正規化はしない)/ `clear` / `errors: { row, rowIndex, message }[]` / `isValid` / `gridProps`(`{ onRowsChange, createRow }` をそのままスプレッド)。
+
+**注意**: `createRow` / `isEmptyRow` / `normalizeRow` / `validateRow` はコンポーネント外か `useCallback` で定義してください(インラインだと毎レンダー再導出)。
+
 ### `ComparisonView<T extends object>`
 
 左右 2 ペイン + ヘッダースロットの CSS Grid 2 カラムレイアウトです。
