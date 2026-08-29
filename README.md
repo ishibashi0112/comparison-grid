@@ -27,7 +27,7 @@ npm install @ishibashi0112/comparison-grid @ishibashi0112/spreadsheet-grid
 # pnpm add @ishibashi0112/comparison-grid @ishibashi0112/spreadsheet-grid
 ```
 
-Peer dependencies: **react** / **react-dom** `>= 19` and **@ishibashi0112/spreadsheet-grid** `>= 0.28.1 < 1`.
+Peer dependencies: **react** / **react-dom** `>= 19` and **@ishibashi0112/spreadsheet-grid** `>= 0.29.0 < 1`.
 
 ## Styles
 
@@ -251,7 +251,7 @@ npm install @ishibashi0112/comparison-grid @ishibashi0112/spreadsheet-grid
 # pnpm add @ishibashi0112/comparison-grid @ishibashi0112/spreadsheet-grid
 ```
 
-peer dependencies: **react** / **react-dom** `>= 19`、**@ishibashi0112/spreadsheet-grid** `>= 0.28.1 < 1`。
+peer dependencies: **react** / **react-dom** `>= 19`、**@ishibashi0112/spreadsheet-grid** `>= 0.29.0 < 1`。
 
 ### スタイル
 

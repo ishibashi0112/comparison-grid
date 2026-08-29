@@ -148,7 +148,7 @@ type ComparisonLabels = {
 | --- | --- |
 | `rows` / `columns` | ライブラリが与える(型から除外)。 |
 | `dataSource` | serverSide モードは比較と両立しないため除外。 |
-| `getRowClassName` | ライブラリの行クラスと**合成**(`'cmpg-row-diff cmpg-row-diff--field your-class'`)。 |
+| `getRowClassName` | ライブラリの行クラスと**合成**(`'cmpg-row-diff cmpg-row-diff--field your-class'`)。第 3 引数 `ctx: RowStyleContext<T>`(spreadsheet-grid v0.29.0)も利用側の関数へそのまま透過。 |
 | `className` | `'cmpg-grid your-class'` に合成。 |
 | 列の `cellClassName` | 強調対象列だけライブラリのクラスと合成(文字列 / 関数どちらも可)。対象外の列は同一参照で通過。 |
 | それ以外 | そのまま透過(`theme` / `density` / `enable*` / `show*` / `ref` / `onStateChange` / `getContextMenuItems` …)。 |
@@ -157,7 +157,7 @@ type ComparisonLabels = {
 
 ### 型ユーティリティ
 
-- `GridCellStyleContext<T>` — `GridColumn<T>['cellClassName']`(関数版)の引数型。spreadsheet-grid が `CellStyleContext` をバレル公開していないため列型から導出しています。
+- `GridCellStyleContext<T>` — `GridColumn<T>['cellClassName']`(関数版)の引数型。spreadsheet-grid v0.29.0 で公開された `CellStyleContext<T>` の別名です(公開前は列型からの導出で代替していました)。
 
 ## クラスとトークン(styles.css)
 

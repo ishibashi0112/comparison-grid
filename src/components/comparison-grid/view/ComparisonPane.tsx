@@ -68,9 +68,7 @@ export function ComparisonPane<T extends object>(props: ComparisonPaneProps<T>) 
       <div className="cmpg-pane-body">
         <SpreadsheetGrid<T>
           {...gridProps}
-          // 注記: SpreadsheetGridProps.rows は T[](mutable)のため readonly からキャストします。
-          //   グリッドは rows を変更しません(編集は onRowsChange で新配列を返す設計)。
-          rows={rows as T[]}
+          rows={rows}
           columns={composedColumns}
           getRowClassName={getRowClassName}
           className={cx('cmpg-grid', gridProps?.className)}

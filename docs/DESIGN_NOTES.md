@@ -35,9 +35,11 @@
 
 作業中に「あると楽 / 型が緩い / API が足りない」と感じた点。優先度順。spreadsheet-grid 側へ渡す詳細版(背景 / 現状 / API 案 / 互換性)は `docs/SPREADSHEET_GRID_PROPOSALS.md`。
 
-1. **`CellStyleContext` をバレルから公開する。** `GridColumn.cellClassName` の関数版の引数型が未公開のため、`GridCellStyleContext<T> = Parameters<Exclude<NonNullable<GridColumn<T>['cellClassName']>, string>>[0]` で導出している(`model/types.ts`)。公開されたら差し替える。
-2. **`rows` / `columns` を `readonly` 配列で受け付ける。** `useMemo` 由来の `readonly T[]` を渡すのにキャストが要る(`ComparisonPane` の `rows as T[]`)。グリッドは配列を変更しないので `readonly T[]` / `readonly GridColumn<T>[]` にしても実装は変わらないはず。
-3. **jsdom テスト用のレイアウトスタブを公式化する。** 列仮想化が ResizeObserver の通知だけで幅を得るため、no-op スタブでは列が 1 本も描画されない(本リポジトリの `ComparisonView.test.tsx` に「observe 時に即時コールバックする ResizeObserver + clientWidth/Height + getBoundingClientRect」のスタブがある)。`@ishibashi0112/spreadsheet-grid/testing` の `installJsdomLayoutStubs()` のようなヘルパー、または README の「Testing」節として提供すると、利用側(ss2602 など)の結合テストが書きやすくなる。spreadsheet-grid 自身の validation テストも「仮想化行が jsdom で描画されない」前提で書かれているので、同じ手当てで本体テストも DOM 検証に広げられる。
+**採用状況(2026-08-29 追記)**: spreadsheet-grid v0.29.0(コミット「proposals batch 1〜6」)で 1・2・3・5・6・8 が採用、7 は (b)(現状維持 + API_REFERENCE への明記)を採用。4 は既存の `rowKeyGetter` prop が該当していた(0.28.1 時点で存在。提案書の「現状」認識が誤り)ため変更なし。採用時の本リポジトリ側の対応(`GridCellStyleContext` の再エクスポート化 / `rows as T[]` キャスト削除 / `installJsdomLayoutStubs()` への置換 / peer 下限 `>=0.29.0`)は反映済み。項目ごとの詳細は `docs/SPREADSHEET_GRID_PROPOSALS.md` の「採用結果」を参照。
+
+1. **`CellStyleContext` をバレルから公開する。** `GridColumn.cellClassName` の関数版の引数型が未公開のため、`GridCellStyleContext<T> = Parameters<Exclude<NonNullable<GridColumn<T>['cellClassName']>, string>>[0]` で導出していた(`model/types.ts`)。v0.29.0 で公開され、再エクスポートへ差し替え済み。
+2. **`rows` / `columns` を `readonly` 配列で受け付ける。** `useMemo` 由来の `readonly T[]` を渡すのにキャストが要った(`ComparisonPane` の `rows as T[]`)。v0.29.0 で readonly 化され(`filterOptions` も)、キャストは削除済み。
+3. **jsdom テスト用のレイアウトスタブを公式化する。** 列仮想化が ResizeObserver の通知だけで幅を得るため、no-op スタブでは列が 1 本も描画されない(本リポジトリの `ComparisonView.test.tsx` に「observe 時に即時コールバックする ResizeObserver + clientWidth/Height + getBoundingClientRect」のスタブがある)。`@ishibashi0112/spreadsheet-grid/testing` の `installJsdomLayoutStubs()` のようなヘルパー、または README の「Testing」節として提供すると、利用側(ss2602 など)の結合テストが書きやすくなる。v0.29.0 で `/testing` サブパスとして公開され、`ComparisonView.test.tsx` の自前スタブは公式ヘルパーへ置換済み。
 4. **`getRowKey`(利用側の行キー)prop。** 現状の行キーは内部導出で利用側から指定できない。Phase 2 のマニュアル入力ペイン(編集で行オブジェクトが差し替わる)や、比較結果の行選択状態を維持したい場面で、安定した行 ID が欲しくなる。
 5. **`getRowClassName` のコンテキスト版。** `cellClassName` は `CellStyleContext`(`sourceRowIndex` / `rowKey` 付き)を受け取るのに対し `getRowClassName` は `(row, rowIndex)` のみ。`(ctx: RowStyleContext<T>) => string` のオーバーロードがあると対称になる(本ライブラリはサイドカーで行オブジェクトから引けるため未使用)。
 6. **状態クラスの公開契約化。** `.ssg-body-cell--row-hovered` / `--readonly` / `--invalid` などをホバー色の連結に使っている。API_REFERENCE に「スタイル用の状態クラス一覧」として載せておくと、利用側が安心して連結できる。
@@ -54,6 +56,6 @@
 
 ## 6. 環境メモ
 
-- spreadsheet-grid: `~/dev/datasheet-grid`(GitHub `ishibashi0112/datasheet-grid`)。v0.28.1 = npm latest(2026-08-27)。ss2602 は `^0.16.0` 固定なので、ライブラリ導入時に 0.28 系へ上げる必要がある(0.17〜0.28 で export scope の改名や既定値変更あり)。
+- spreadsheet-grid: `~/dev/datasheet-grid`(GitHub `ishibashi0112/datasheet-grid`)。v0.29.0 = npm latest(2026-08-29・提案対応リリース「proposals batch 1〜6」)。ss2602 は `^0.16.0` 固定なので、ライブラリ導入時に 0.29 系へ上げる必要がある(0.17〜0.28 で export scope の改名や既定値変更あり)。
 - 引き継ぎ書と ss2602 の repomix は UTF-8 → Latin-1 の文字化け状態で受領したが内容は復元済み。Web 版へ持ち込む際は UTF-8 保存を確認。
 - パッケージ名 `@ishibashi0112/comparison-grid` は npm 未使用(2026-08-29 時点)。`package.json` の `repository` URL は `ishibashi0112/comparison-grid` を仮置き(リポジトリ作成後に確定)。

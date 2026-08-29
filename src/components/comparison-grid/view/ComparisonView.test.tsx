@@ -3,67 +3,25 @@
 //   - 差分行クラス(.cmpg-row-diff)/ キー列セル / 差分フィールドセル / 差分ラベル列
 //   - enable* の無効化と利用側 getRowClassName / cellClassName との共存
 // @vitest-environment jsdom
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import type { GridColumn } from '@ishibashi0112/spreadsheet-grid';
+import { installJsdomLayoutStubs } from '@ishibashi0112/spreadsheet-grid/testing';
 import { ComparisonView } from './ComparisonView';
 import { useComparison } from '../hooks/useComparison';
 import type { CompareField, ComparisonViewProps, UseComparisonOptions } from '../model/types';
 
-// jsdom には ResizeObserver / Element.scrollTo が無い(SpreadsheetGrid がマウント時に使う)ため最小スタブ。
-//   また jsdom はレイアウトを持たず clientHeight / clientWidth / getBoundingClientRect が 0 のため、
-//   仮想化された本体行が 1 行も描画されません。ビューポート寸法を固定値で返すスタブを入れて
-//   実グリッドに行 / セルを描画させ、ハイライトの配線を DOM で検証します。
+// jsdom はレイアウトを持たないため、素のままでは仮想化された行 / 列が 1 本も描画されません。
+//   spreadsheet-grid v0.29.0 の公式スタブでビューポート寸法(既定 1200×600)と
+//   observe 時に即時発火する ResizeObserver を与え、実グリッドに行 / セルを描画させて
+//   ハイライトの配線を DOM で検証します。
+let uninstallLayoutStubs: (() => void) | undefined;
 beforeAll(() => {
-  Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
-    configurable: true,
-    get: () => 600,
-  });
-  Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
-    configurable: true,
-    get: () => 1200,
-  });
-  Element.prototype.getBoundingClientRect = () =>
-    ({
-      x: 0,
-      y: 0,
-      top: 0,
-      left: 0,
-      bottom: 600,
-      right: 1200,
-      width: 1200,
-      height: 600,
-      toJSON: () => ({}),
-    }) as DOMRect;
-  // 列仮想化(@tanstack/react-virtual)はスクロール要素の矩形を ResizeObserver の通知から得るため、
-  //   observe 時に固定寸法で即時コールバックするスタブを入れます(no-op だと列が 1 本も描画されません)。
-  type ResizeObserverCallbackLike = (entries: unknown[], observer: unknown) => void;
-  class ResizeObserverStub {
-    private readonly callback: ResizeObserverCallbackLike;
-    constructor(callback: ResizeObserverCallbackLike) {
-      this.callback = callback;
-    }
-    observe(target: Element): void {
-      const size = { inlineSize: 1200, blockSize: 600 };
-      this.callback(
-        [
-          {
-            target,
-            contentRect: { width: 1200, height: 600, top: 0, left: 0 },
-            borderBoxSize: [size],
-            contentBoxSize: [size],
-          },
-        ],
-        this,
-      );
-    }
-    unobserve(): void {}
-    disconnect(): void {}
-  }
-  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = ResizeObserverStub;
-  if (!Element.prototype.scrollTo) {
-    Element.prototype.scrollTo = () => {};
-  }
+  uninstallLayoutStubs = installJsdomLayoutStubs();
+});
+
+afterAll(() => {
+  uninstallLayoutStubs?.();
 });
 
 afterEach(() => {

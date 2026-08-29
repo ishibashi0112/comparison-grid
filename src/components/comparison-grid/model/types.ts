@@ -4,6 +4,7 @@
 //   利用側は GridColumn<T> / SpreadsheetGridProps<T> を「T の型のまま」書けます。
 import type { CSSProperties, ReactNode } from 'react';
 import type {
+  CellStyleContext,
   GridColumn,
   SpreadsheetGridProps,
 } from '@ishibashi0112/spreadsheet-grid';
@@ -145,11 +146,9 @@ export type UseComparisonResult<T> = ComparisonResult<T> & {
   getDiff: (row: T) => ComparisonRowDiff<T> | undefined;
 };
 
-/** GridColumn.cellClassName(関数版)が受け取るコンテキストです。spreadsheet-grid が CellStyleContext を
- *  バレルから公開していないため、列型から導出します(公開されたら差し替え予定)。 */
-export type GridCellStyleContext<T> = Parameters<
-  Exclude<NonNullable<GridColumn<T>['cellClassName']>, string>
->[0];
+/** GridColumn.cellClassName(関数版)が受け取るコンテキストです。spreadsheet-grid v0.29.0 で
+ *  公開された CellStyleContext の別名です(公開前は列型からの導出で代替していました)。 */
+export type GridCellStyleContext<T> = CellStyleContext<T>;
 
 /** ペインが SpreadsheetGrid へ透過する props。rows / columns / dataSource はライブラリが予約します。 */
 export type ComparisonGridProps<T> = Omit<
