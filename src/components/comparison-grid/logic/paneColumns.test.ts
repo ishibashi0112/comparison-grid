@@ -138,12 +138,41 @@ describe('composeColumns', () => {
 });
 
 describe('composeRowClassName', () => {
+  // 0.29.0 追従: 合成関数は第 3 引数 ctx(RowStyleContext)を透過する。
+  const rowCtx = (r: Row, rowIndex: number) => ({
+    row: r,
+    rowIndex,
+    sourceRowIndex: rowIndex,
+    rowKey: rowIndex,
+    isSelected: false,
+  });
+
   it('ライブラリの行クラスと利用側 getRowClassName を合成する', () => {
     const user = (r: Row) => (r.id === 'B' ? 'user-b' : undefined);
     const fn = composeRowClassName(result.leftDiffs, user, true);
-    expect(fn?.(left[0], 0)).toBeUndefined();
-    expect(fn?.(left[1], 1)).toBe('cmpg-row-diff cmpg-row-diff--field user-b');
-    expect(fn?.(left[2], 2)).toBe('cmpg-row-diff cmpg-row-diff--left-only');
+    expect(fn?.(left[0], 0, rowCtx(left[0], 0))).toBeUndefined();
+    expect(fn?.(left[1], 1, rowCtx(left[1], 1))).toBe(
+      'cmpg-row-diff cmpg-row-diff--field user-b',
+    );
+    expect(fn?.(left[2], 2, rowCtx(left[2], 2))).toBe(
+      'cmpg-row-diff cmpg-row-diff--left-only',
+    );
+  });
+
+  it('利用側の 3 引数関数へ ctx がそのまま渡る', () => {
+    const seenKeys: Array<string | number> = [];
+    const user: Parameters<typeof composeRowClassName<Row>>[1] = (
+      _row,
+      _rowIndex,
+      ctx,
+    ) => {
+      seenKeys.push(ctx.rowKey);
+      return undefined;
+    };
+    const fn = composeRowClassName(result.leftDiffs, user, true);
+    fn?.(left[0], 0, rowCtx(left[0], 0));
+    fn?.(left[1], 5, rowCtx(left[1], 5));
+    expect(seenKeys).toEqual([0, 5]);
   });
 
   it('enableRowHighlight=false は利用側の関数をそのまま返す', () => {

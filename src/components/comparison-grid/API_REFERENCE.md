@@ -157,7 +157,7 @@ type ComparisonLabels = {
 
 ### 型ユーティリティ
 
-- `GridCellStyleContext<T>` — `GridColumn<T>['cellClassName']`(関数版)の引数型。spreadsheet-grid が `CellStyleContext` をバレル公開していないため列型から導出しています。
+- `GridCellStyleContext<T>` — `GridColumn<T>['cellClassName']`(関数版)の引数型。spreadsheet-grid 0.29.0 でバレル公開された `CellStyleContext<T>` の再エクスポートです(shape は従来の導出型と同一のため利用側は無変更)。
 
 ## クラスとトークン(styles.css)
 

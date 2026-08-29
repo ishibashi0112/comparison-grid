@@ -2,7 +2,7 @@
 //   利用側の GridColumn<T> は変換せず、強調対象の列(キー列 / compareFields 対応列)だけ
 //   cellClassName を「ライブラリのクラス + 利用側のクラス」に合成した新しい列オブジェクトへ差し替えます。
 //   対象外の列は同一参照のまま返します。
-import type { GridColumn } from '@ishibashi0112/spreadsheet-grid';
+import type { GridColumn, RowStyleContext } from '@ishibashi0112/spreadsheet-grid';
 import type {
   CompareField,
   ComparisonDiffMap,
@@ -129,7 +129,13 @@ export const composeColumns = <T>(
   });
 };
 
-export type RowClassNameGetter<T> = (row: T, rowIndex: number) => string | undefined;
+// 変更(spreadsheet-grid 0.29.0 追従): getRowClassName の第 3 引数 ctx(RowStyleContext)を
+//   透過します(提案 #5 採用)。利用側の 2 引数関数もそのまま代入できます(引数省略互換)。
+export type RowClassNameGetter<T> = (
+  row: T,
+  rowIndex: number,
+  ctx: RowStyleContext<T>,
+) => string | undefined;
 
 /** ライブラリの行クラスと利用側 getRowClassName を合成します。 */
 export const composeRowClassName = <T>(
@@ -138,8 +144,8 @@ export const composeRowClassName = <T>(
   enableRowHighlight: boolean,
 ): RowClassNameGetter<T> | undefined => {
   if (!enableRowHighlight) return userGetRowClassName;
-  return (row, rowIndex) =>
-    cx(getDiffRowClassName(diffs.get(row)), userGetRowClassName?.(row, rowIndex));
+  return (row, rowIndex, ctx) =>
+    cx(getDiffRowClassName(diffs.get(row)), userGetRowClassName?.(row, rowIndex, ctx));
 };
 
 /** 差分ラベル列を挿入した列配列を返します。 */

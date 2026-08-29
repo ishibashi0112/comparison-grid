@@ -14,7 +14,7 @@
 | トグル無効条件 | `hasAnyDiff` / `hasBothSides` を返す | 加えて `canShowDiffOnly = hasBothSides && hasAnyDiff` を返す | ss2602 の `isDiffSwitchDisabled` を 1 値で置き換え |
 | 差分ラベル列 | 言及なし | `showDiffLabelColumn` / `diffLabelColumn` で自動挿入(既定 OFF)+ `getDiff(row)` で自作列も可 | 行に `diffLabel` が無いため利用側が列を書けない |
 | セル強調の対応列 | `compareFields.key` と列キーの一致 | 加えて `CompareField.columnKey` で別列を指定可 | `getValue` で計算値を比較するケース |
-| peer 範囲 | 最新に合わせる | `>=0.28.1 <1.0.0` | 0.x で minor が頻繁に上がる(`^0.28` だと 0.29 で弾かれる) |
+| peer 範囲 | 最新に合わせる | `>=0.29.0 <1.0.0` | 0.x で minor が頻繁に上がる(`^0.28` だと 0.29 で弾かれる) |
 
 ## 2. API の決定事項(補足)
 
@@ -33,7 +33,9 @@
 
 ## 4. spreadsheet-grid への提案(本リポジトリでは実装しない)
 
-作業中に「あると楽 / 型が緩い / API が足りない」と感じた点。優先度順。spreadsheet-grid 側へ渡す詳細版(背景 / 現状 / API 案 / 互換性)は `docs/SPREADSHEET_GRID_PROPOSALS.md`。
+作業中に「あると楽 / 型が緩い / API が足りない」と感じた点。優先度順。spreadsheet-grid 側へ渡す詳細版(背景 / 現状 / API 案 / 互換性)と**採否結果**は `docs/SPREADSHEET_GRID_PROPOSALS.md`。
+
+**2026-08-29 更新**: spreadsheet-grid v0.29.0 で #1 / #2 / #3 / #5 / #6 / #8 が採用・実装され、本リポジトリ側の対応(再エクスポート化・キャスト削除・公式スタブへの置き換え・peer 下限上げ)も反映済み。#4 は既存の `rowKeyGetter` prop で充足(提案時の見落とし)、#7 は案 (b)(明記のみ)採用。以下は提案時点の記録として残す。
 
 1. **`CellStyleContext` をバレルから公開する。** `GridColumn.cellClassName` の関数版の引数型が未公開のため、`GridCellStyleContext<T> = Parameters<Exclude<NonNullable<GridColumn<T>['cellClassName']>, string>>[0]` で導出している(`model/types.ts`)。公開されたら差し替える。
 2. **`rows` / `columns` を `readonly` 配列で受け付ける。** `useMemo` 由来の `readonly T[]` を渡すのにキャストが要る(`ComparisonPane` の `rows as T[]`)。グリッドは配列を変更しないので `readonly T[]` / `readonly GridColumn<T>[]` にしても実装は変わらないはず。
@@ -54,6 +56,6 @@
 
 ## 6. 環境メモ
 
-- spreadsheet-grid: `~/dev/datasheet-grid`(GitHub `ishibashi0112/datasheet-grid`)。v0.28.1 = npm latest(2026-08-27)。ss2602 は `^0.16.0` 固定なので、ライブラリ導入時に 0.28 系へ上げる必要がある(0.17〜0.28 で export scope の改名や既定値変更あり)。
+- spreadsheet-grid: `~/dev/datasheet-grid`(GitHub `ishibashi0112/datasheet-grid`)。v0.29.0 = npm latest(2026-08-29。comparison-grid の提案 #1〜#3 / #5 / #6 / #8 を採用)。ss2602 は `^0.16.0` 固定なので、ライブラリ導入時に 0.28 系へ上げる必要がある(0.17〜0.28 で export scope の改名や既定値変更あり)。
 - 引き継ぎ書と ss2602 の repomix は UTF-8 → Latin-1 の文字化け状態で受領したが内容は復元済み。Web 版へ持ち込む際は UTF-8 保存を確認。
 - パッケージ名 `@ishibashi0112/comparison-grid` は npm 未使用(2026-08-29 時点)。`package.json` の `repository` URL は `ishibashi0112/comparison-grid` を仮置き(リポジトリ作成後に確定)。
