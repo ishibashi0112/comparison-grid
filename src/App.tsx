@@ -6,6 +6,7 @@ import type { GridColumn, GridTheme } from '@ishibashi0112/spreadsheet-grid';
 import {
   ComparisonView,
   useComparison,
+  useComparisonNavigation,
   type CompareField,
   type ComparisonGridProps,
 } from './components/comparison-grid';
@@ -108,6 +109,9 @@ export default function App() {
     alignRows,
   });
 
+  // 差分ジャンプ: グリッドのハンドル ref はフックが生成し、leftGridProps / rightGridProps で配線する。
+  const navigation = useComparisonNavigation<BomRow>({ comparison, alignRows });
+
   // SpreadsheetGrid の props はそのまま透過できる(ソート / フィルター等の機能もここで有効化)。
   const gridProps = useMemo<ComparisonGridProps<BomRow>>(
     () => ({
@@ -125,6 +129,16 @@ export default function App() {
       enableUndoRedo: false,
     }),
     [theme, enableGridFeatures],
+  );
+
+  // 差分ジャンプ用のハンドル ref を片側ずつ渡す(enableScrollSync の内部 ref とは合成される)。
+  const leftGridProps = useMemo<ComparisonGridProps<BomRow>>(
+    () => ({ ref: navigation.leftRef }),
+    [navigation.leftRef],
+  );
+  const rightGridProps = useMemo<ComparisonGridProps<BomRow>>(
+    () => ({ ref: navigation.rightRef }),
+    [navigation.rightRef],
   );
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -229,6 +243,27 @@ export default function App() {
               <option value="auto">auto</option>
             </select>
           </label>
+          <button
+            type="button"
+            className="demo-button"
+            onClick={navigation.goToPreviousDiff}
+            disabled={!navigation.canNavigate}
+          >
+            ◀ 前の差分
+          </button>
+          <button
+            type="button"
+            className="demo-button"
+            onClick={navigation.goToNextDiff}
+            disabled={!navigation.canNavigate}
+          >
+            次の差分 ▶
+          </button>
+          <span className="demo-toggle">
+            {navigation.activeDiffIndex >= 0
+              ? `${navigation.activeDiffIndex + 1} / ${navigation.diffCount}`
+              : `差分 ${navigation.diffCount} 件`}
+          </span>
         </form>
         {hasData ? (
           <p className="demo-summary">
@@ -256,6 +291,8 @@ export default function App() {
           leftHeader={<PaneHeader info={toRootItemInfo(leftRows)} />}
           rightHeader={<PaneHeader info={toRootItemInfo(rightRows)} />}
           gridProps={gridProps}
+          leftGridProps={leftGridProps}
+          rightGridProps={rightGridProps}
         />
       </main>
     </div>

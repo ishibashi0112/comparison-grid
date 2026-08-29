@@ -12,6 +12,7 @@ export { getComparisonExportData } from './logic/exportData';
 export { CMPG_CLASS_NAMES, DEFAULT_DIFF_LABEL_COLUMN_KEY } from './logic/paneColumns';
 // React 層。
 export { useComparison } from './hooks/useComparison';
+export { useComparisonNavigation } from './hooks/useComparisonNavigation';
 export { ComparisonPane } from './view/ComparisonPane';
 export { ComparisonView } from './view/ComparisonView';
 
@@ -37,6 +38,9 @@ export type {
   ComparisonExportOptions,
   UseComparisonOptions,
   UseComparisonResult,
+  ComparisonDiffStop,
+  UseComparisonNavigationOptions,
+  UseComparisonNavigationResult,
   GridCellStyleContext,
   ComparisonGridProps,
   ComparisonHighlightOptions,

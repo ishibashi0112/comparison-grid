@@ -2,10 +2,12 @@
 //   設計方針(サイドカー方式): 利用側の行 T には一切書き込まず、差分情報は行オブジェクトを
 //   キーにした Map(ComparisonDiffMap)で横持ちします。グリッドへは T[] をそのまま渡すため、
 //   利用側は GridColumn<T> / SpreadsheetGridProps<T> を「T の型のまま」書けます。
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, ReactNode, RefObject } from 'react';
 import type {
   CellStyleContext,
   GridColumn,
+  ScrollAlign,
+  SpreadsheetGridHandle,
   SpreadsheetGridProps,
 } from '@ishibashi0112/spreadsheet-grid';
 
@@ -211,6 +213,49 @@ export type ComparisonDiffLabelColumnProps<T> = {
   /** 差分ラベル列を自動追加(既定 false)。 */
   showDiffLabelColumn?: boolean;
   diffLabelColumn?: DiffLabelColumnOptions<T>;
+};
+
+/** 差分ジャンプの 1 停止位置。index は visibleLeft / visibleRight 上の行位置。 */
+export type ComparisonDiffStop<T> = {
+  kind: Exclude<ComparisonDiffKind, 'same'>;
+  /** visibleLeft 上の行 index(この側に行が無い停止では undefined)。 */
+  leftIndex?: number;
+  /** visibleRight 上の行 index(同上)。 */
+  rightIndex?: number;
+  leftRow?: T;
+  rightRow?: T;
+};
+
+export type UseComparisonNavigationOptions<T> = {
+  /** useComparison の戻り値(visibleLeft / visibleRight / leftDiffs / rightDiffs を使用)。 */
+  comparison: Pick<
+    UseComparisonResult<T>,
+    'visibleLeft' | 'visibleRight' | 'leftDiffs' | 'rightDiffs'
+  >;
+  /** alignRows 利用時に true。片側のみの停止でも同じ行位置で両ペインをスクロールする。 */
+  alignRows?: boolean;
+  /** scrollToRow の align(既定 'center')。 */
+  align?: ScrollAlign;
+};
+
+export type UseComparisonNavigationResult<T> = {
+  /** 左ペインのグリッドへ `leftGridProps={{ ref: leftRef }}` で渡す。 */
+  leftRef: RefObject<SpreadsheetGridHandle<T> | null>;
+  /** 右ペインのグリッドへ `rightGridProps={{ ref: rightRef }}` で渡す。 */
+  rightRef: RefObject<SpreadsheetGridHandle<T> | null>;
+  /** 停止位置(visibleLeft の行順 → 左に無い右行は visibleRight の行順で末尾)。 */
+  diffStops: readonly ComparisonDiffStop<T>[];
+  diffCount: number;
+  /** 現在の停止位置(未移動は -1)。visibleLeft / visibleRight が変わるとリセットされる。 */
+  activeDiffIndex: number;
+  /** diffCount > 0。ボタンの disabled に。 */
+  canNavigate: boolean;
+  /** 指定位置へ(範囲外はラップ)。 */
+  goToDiff: (index: number) => void;
+  /** 次の差分へ(末尾からは先頭へ)。 */
+  goToNextDiff: () => void;
+  /** 前の差分へ(先頭・未移動からは末尾へ)。 */
+  goToPreviousDiff: () => void;
 };
 
 /** getComparisonExportData() のオプション。 */

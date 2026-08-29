@@ -136,6 +136,28 @@ type ComparisonLabels = {
 
 **メモ化**: `left` / `right` / `getMatchKey` / `formatDiffLabel` / `duplicateKeyPolicy` / `createPlaceholderRow` は参照(同一性)で、`compareFields` / `labels` は**浅い構造比較**で依存を判定します。つまり `compareFields: [{ key: 'qty', label: '数量' }]` のようなインライン記述は毎レンダー書き直しても再計算されませんが、`getValue` / `equals` / `getMatchKey` / `createPlaceholderRow` をインライン関数で書くと毎レンダー再計算されます(コンポーネント外か `useCallback` で定義してください。特に `createPlaceholderRow` はプレースホルダ行の同一性が毎レンダー変わり、グリッドが行の差し替えと誤認します)。
 
+### `useComparisonNavigation<T>(options): UseComparisonNavigationResult<T>`
+
+差分ジャンプ(次 / 前の差分行へのスクロール)。グリッドのハンドル `ref` は**フックが生成して返す**ので、`leftGridProps={{ ref: leftRef }}` / `rightGridProps={{ ref: rightRef }}` で配線します(`enableScrollSync` の内部 ref とは自動で合成されます)。
+
+| オプション | 型 | 既定 | 説明 |
+| --- | --- | --- | --- |
+| `comparison` | `Pick<UseComparisonResult<T>, 'visibleLeft' \| 'visibleRight' \| 'leftDiffs' \| 'rightDiffs'>` | (required) | `useComparison` の戻り値をそのまま渡せる。 |
+| `alignRows` | `boolean` | `false` | `useComparison` と同じ値を渡す。true なら片側のみの停止(left-only / right-only)でも同じ行位置で両ペインをスクロールする(整列表示ではプレースホルダ位置)。 |
+| `align` | `ScrollAlign` | `'center'` | `scrollToRow` の align。 |
+
+戻り値:
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `leftRef` / `rightRef` | `RefObject<SpreadsheetGridHandle<T> \| null>` | 各ペインへ渡すハンドル ref。 |
+| `diffStops` | `readonly ComparisonDiffStop<T>[]` | 停止位置(`visibleLeft` の行順 → 左に無い右行は `visibleRight` の行順で末尾。alignRows の対順と同じ規則)。各停止は `kind` / `leftIndex` / `rightIndex` / `leftRow` / `rightRow` を持つ。 |
+| `diffCount` / `canNavigate` | `number` / `boolean` | 停止数 / `diffCount > 0`(ボタンの `disabled` に)。 |
+| `activeDiffIndex` | `number` | 現在の停止位置(未移動は `-1`)。表示行が変わるとリセット。 |
+| `goToNextDiff()` / `goToPreviousDiff()` / `goToDiff(index)` | `() => void` 等 | 移動(範囲外はラップ: 末尾の次は先頭、未移動からの「前」は末尾)。 |
+
+**注意**: `scrollToRow` は view index を受け取るため、**グリッド側のソート / フィルター**(`enableSorting` / `enableColumnFilter` 等)を適用中は行位置がずれます。差分ジャンプは比較結果の並びのまま表示している画面で使ってください。
+
 ### `ComparisonView<T extends object>`
 
 左右 2 ペイン + ヘッダースロットの CSS Grid 2 カラムレイアウトです。
