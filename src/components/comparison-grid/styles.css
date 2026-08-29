@@ -1,0 +1,80 @@
+/* comparison-grid のスタイル。方針は spreadsheet-grid(THEME-1)と同じです:
+   - 未レイヤーの単一クラス基底(特異度 (0,1,0))。Tailwind preflight(要素 / * セレクタ)に構造的に勝ちます。
+   - ハイライトは spreadsheet-grid の基底セル(.ssg-body-cell)へ連結セレクタ(特異度 (0,2,0))で
+     かけるため、読み込み順に依らずグリッド既定(セル背景 / 文字色 / readonly 背景)に勝ちます。
+   - デザイントークン(--cmpg-*)は :where()(特異度 0)に置くため、利用側の
+     `.cmpg-pane { --cmpg-diff-row-bg: ... }` 等の上書きは読み込み順に依らず必ず勝ちます。
+   - ダーク: spreadsheet-grid の theme="dark" がグリッド root へ付与する .ssg-theme-dark 配下で
+     トークンを差し替えます(利用側は `.cmpg-pane .ssg-theme-dark { ... }` で上書き)。
+   - Tailwind v4 で utilities を優先したい場合は `@import "...style.css" layer(components);` または
+     @layer cmpg-base 版の style.layer.css を使います(README「Styles」参照)。 */
+
+:where(.cmpg-view) {
+  --cmpg-view-gap: 16px;
+}
+
+:where(.cmpg-pane) {
+  --cmpg-pane-header-min-height: 24px;
+  --cmpg-pane-header-gap-x: 16px;
+  --cmpg-pane-header-gap-y: 4px;
+  --cmpg-pane-header-margin-bottom: 4px;
+  /* 差分行(same 以外)の背景。ss2602 実績の黄系(Tailwind yellow-100 / yellow-200)。 */
+  --cmpg-diff-row-bg: #fef9c3;
+  --cmpg-diff-row-hover-bg: #fef08a;
+  /* 強調セル(キー列 / 差分フィールド)の文字。ss2602 実績の赤太字(Tailwind red-600)。 */
+  --cmpg-diff-text: #dc2626;
+  --cmpg-diff-font-weight: 700;
+}
+
+:where(.cmpg-pane .ssg-theme-dark) {
+  --cmpg-diff-row-bg: rgba(250, 204, 21, 0.14);
+  --cmpg-diff-row-hover-bg: rgba(250, 204, 21, 0.22);
+  --cmpg-diff-text: #f87171;
+}
+
+/* レイアウト */
+.cmpg-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--cmpg-view-gap);
+  min-width: 0;
+  min-height: 0;
+}
+
+.cmpg-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.cmpg-pane-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--cmpg-pane-header-gap-x);
+  row-gap: var(--cmpg-pane-header-gap-y);
+  min-height: var(--cmpg-pane-header-min-height);
+  margin-bottom: var(--cmpg-pane-header-margin-bottom);
+  min-width: 0;
+}
+
+.cmpg-pane-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* 差分ハイライト(getRowClassName の返り値は行コンテナと各データセルに付与されます) */
+.ssg-body-cell.cmpg-row-diff {
+  background-color: var(--cmpg-diff-row-bg);
+}
+
+.ssg-body-cell.cmpg-row-diff.ssg-body-cell--row-hovered {
+  background-color: var(--cmpg-diff-row-hover-bg);
+}
+
+.ssg-body-cell.cmpg-cell-diff {
+  color: var(--cmpg-diff-text);
+  font-weight: var(--cmpg-diff-font-weight);
+}
