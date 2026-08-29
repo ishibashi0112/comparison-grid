@@ -30,7 +30,7 @@ spreadsheet-grid リポジトリのブランチ `claude/spreadsheet-grid-proposa
 | 4 | ➖ 既存機能で充足 | 提案の `getRowKey` 相当は **`rowKeyGetter` prop として実装済みだった**(`(row, index) => GridRowKey`。clientSide / serverSide 両対応、選択・`ctx.rowKey`・React key に配線済み)。comparison-grid 側はこれを利用すればよい。 |
 | 5 | ✅ 採用 | `getRowClassName` に第 3 引数 `ctx: RowStyleContext<T>`(`row / rowIndex / sourceRowIndex / rowKey / isSelected`)を追加(batch 3)。完全後方互換。`isGroupRow` はグループ行が `getRowClassName` の対象外(専用描画)のため持たない。 |
 | 6 | ✅ 採用 | 状態クラス一覧を API_REFERENCE / website に「公開契約」(変更時 breaking 扱い)として明記(batch 4)。 |
-| 7 | ✅ 案 (b) を採用 | 現状維持のうえ「未指定 / 空文字は `key` を表示」を明記。案 (a) の挙動変更は既存利用側への影響があるため保留(要判断のまま)。 |
+| 7 | ✅ 案 (b) を採用 / 案 (a) は見送り確定 | 現状維持のうえ「未指定 / 空文字は `key` を表示」を明記。案 (a) の挙動変更は **2026-08-29 に見送りで確定**(comparison-grid 側に実害なし。見出しを空にしたい列は `title: ' '` で回避可)。必要が生じたら「ヘッダー表示のみ空文字を尊重・列メニュー等の識別 UI は key 維持」の案で 0.30.0 として実装する。 |
 | 8 | ✅ 採用 | `handle.getScrollPosition()` / `handle.setScrollPosition()` / `props.onScroll`(`source: 'user' \| 'api'`・rAF 間引き)を追加(batch 6)。 |
 
 採用分が npm へ publish されたら、comparison-grid 側の対応(`GridCellStyleContext` の再エクスポート化・`rows as T[]` キャスト削除・自前スタブの `installJsdomLayoutStubs()` 置き換え・peer 下限の引き上げ)を行う。
