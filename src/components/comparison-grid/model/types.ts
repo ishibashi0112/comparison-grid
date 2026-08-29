@@ -213,6 +213,20 @@ export type ComparisonDiffLabelColumnProps<T> = {
   diffLabelColumn?: DiffLabelColumnOptions<T>;
 };
 
+/** getComparisonExportData() のオプション。 */
+export type ComparisonExportOptions<T> = {
+  /** エクスポートする行(`visibleLeft` / `annotatedLeft.map((e) => e.row)` / 整列済み配列など)。 */
+  rows: readonly T[];
+  /** この側の差分 Map(`leftDiffs` / `rightDiffs`)。 */
+  diffs: ComparisonDiffMap<T>;
+  /** 列定義。`visible: false` の列は除外される。 */
+  columns: readonly GridColumn<T>[];
+  /** 差分ラベル列を含める(既定 **true**。ペインの既定 false とは異なることに注意)。 */
+  showDiffLabelColumn?: boolean;
+  /** ラベル列の調整(`key` / `title` / `position` を使用)。 */
+  diffLabelColumn?: DiffLabelColumnOptions<T>;
+};
+
 export type ComparisonPaneProps<T extends object> = ComparisonHighlightOptions &
   ComparisonDiffLabelColumnProps<T> & {
     side: ComparisonSide;

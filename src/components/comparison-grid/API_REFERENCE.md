@@ -95,6 +95,20 @@ type ComparisonLabels = {
 | `pairs` | `{ left: T; right: T }[]` | 突き合わせ順の対。**左の行順**を基準に対を作り、左と対にならなかった右行(right-only / キー重複の残り)を**右の行順**で末尾に並べる。キー重複で複数行が同じ相手を指す場合、相手は先に対になった行が消費する。 |
 | `placeholders` | `ComparisonPlaceholders<T>` = `{ left: ReadonlySet<T>; right: ReadonlySet<T> }` | 各側の配列に挿入されたプレースホルダ行の集合。プレースホルダは差分 Map に載らないため、ハイライト / 差分ラベルは自動的に対象外。 |
 
+### `getComparisonExportData<T>(options): GridExportData`
+
+比較結果 1 側ぶんを spreadsheet-grid の `getExportData()` と同形(`{ columns: { key, title }[], rows: { value, text }[][] }`)で返します。CSV / Excel 出力の下流処理を共用できます。
+
+| オプション | 型 | 既定 | 説明 |
+| --- | --- | --- | --- |
+| `rows` | `readonly T[]` | (required) | エクスポートする行。`visibleLeft` / `annotatedLeft.map((e) => e.row)` / 整列済み配列(対順エクスポート)など。 |
+| `diffs` | `ComparisonDiffMap<T>` | (required) | この側の差分 Map(`leftDiffs` / `rightDiffs`)。 |
+| `columns` | `readonly GridColumn<T>[]` | (required) | 列定義。`visible: false` の列は除外。 |
+| `showDiffLabelColumn` | `boolean` | **`true`** | 差分ラベル列を含める(ペインの既定 `false` と異なる)。 |
+| `diffLabelColumn` | `DiffLabelColumnOptions<T>` | — | ラベル列の調整(`key` / `title` / `position` を使用)。 |
+
+セルの規則: `value` は `getValue ?? row[key]`、`text` は本体の**セル表示**と同じく `value == null` なら `''`(`valueFormatter` を通さない)、それ以外は `valueFormatter({ value, row, column }) ?? String(value)`。列見出しは `title ?? key`。プレースホルダ行(alignRows)は全セル空になります。
+
 ## React 層
 
 ### `useComparison<T>(options): UseComparisonResult<T>`
