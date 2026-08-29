@@ -2,7 +2,7 @@
 //   利用側の GridColumn<T> は変換せず、強調対象の列(キー列 / compareFields 対応列)だけ
 //   cellClassName を「ライブラリのクラス + 利用側のクラス」に合成した新しい列オブジェクトへ差し替えます。
 //   対象外の列は同一参照のまま返します。
-import type { GridColumn } from '@ishibashi0112/spreadsheet-grid';
+import type { GridColumn, RowStyleContext } from '@ishibashi0112/spreadsheet-grid';
 import type {
   CompareField,
   ComparisonDiffMap,
@@ -25,6 +25,8 @@ export const CMPG_CLASS_NAMES = {
   cellKeyDiff: 'cmpg-cell-diff--key',
   /** field-diff 行の差分フィールド列セル。 */
   cellFieldDiff: 'cmpg-cell-diff--field',
+  /** alignRows で欠損側に入るプレースホルダ行(行コンテナ + 各データセル)。 */
+  rowPlaceholder: 'cmpg-row-placeholder',
 } as const;
 
 /** 差分ラベル列の既定キー。 */
@@ -129,17 +131,29 @@ export const composeColumns = <T>(
   });
 };
 
-export type RowClassNameGetter<T> = (row: T, rowIndex: number) => string | undefined;
+/** SpreadsheetGridProps.getRowClassName と同シグネチャ(v0.29.0 で第 3 引数 ctx が追加)。 */
+export type RowClassNameGetter<T> = (
+  row: T,
+  rowIndex: number,
+  ctx: RowStyleContext<T>,
+) => string | undefined;
 
-/** ライブラリの行クラスと利用側 getRowClassName を合成します。 */
+/** ライブラリの行クラス(差分 / プレースホルダ)と利用側 getRowClassName を合成します(ctx は利用側へ透過)。
+ *  プレースホルダ行クラスは差分ハイライトではないため enableRowHighlight に依らず付与します。 */
 export const composeRowClassName = <T>(
   diffs: ComparisonDiffMap<T>,
   userGetRowClassName: RowClassNameGetter<T> | undefined,
   enableRowHighlight: boolean,
+  placeholderRows?: ReadonlySet<T>,
 ): RowClassNameGetter<T> | undefined => {
-  if (!enableRowHighlight) return userGetRowClassName;
-  return (row, rowIndex) =>
-    cx(getDiffRowClassName(diffs.get(row)), userGetRowClassName?.(row, rowIndex));
+  const hasPlaceholders = placeholderRows !== undefined && placeholderRows.size > 0;
+  if (!enableRowHighlight && !hasPlaceholders) return userGetRowClassName;
+  return (row, rowIndex, ctx) =>
+    cx(
+      hasPlaceholders && placeholderRows.has(row) ? CMPG_CLASS_NAMES.rowPlaceholder : undefined,
+      enableRowHighlight ? getDiffRowClassName(diffs.get(row)) : undefined,
+      userGetRowClassName?.(row, rowIndex, ctx),
+    );
 };
 
 /** 差分ラベル列を挿入した列配列を返します。 */

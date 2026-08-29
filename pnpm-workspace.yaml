@@ -1,3 +1,6 @@
+# 自作パッケージは公開直後に取り込むため、リリース経過時間ゲートの対象外にする(pnpm が自動追記)。
+minimumReleaseAgeExclude:
+  - '@ishibashi0112/spreadsheet-grid@0.29.0'
 # vite+(vp)のツールチェーンを使うための overrides です(spreadsheet-grid と同構成)。
 #   vp は同梱ツールへフォールバックすると環境パッケージ(jsdom 等)を同梱側から解決できず
 #   DOM 系テストが起動しません。vite を vite-plus-core へエイリアスし、vitest を vp 同梱

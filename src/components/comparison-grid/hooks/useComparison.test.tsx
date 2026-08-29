@@ -96,6 +96,67 @@ describe('useComparison', () => {
     expect(result.current).toBe(first);
   });
 
+  it('alignRows で左右が同じ長さに整列され、欠損側の行は placeholders に載る', () => {
+    const { result } = renderHook(() =>
+      useComparison<Row>({
+        left,
+        right,
+        getMatchKey,
+        compareFields: [{ key: 'qty', label: '数量' }],
+        alignRows: true,
+      }),
+    );
+    const { visibleLeft, visibleRight, placeholders } = result.current;
+    expect(visibleLeft).toHaveLength(4);
+    expect(visibleRight).toHaveLength(4);
+    // 左順 A / B / C(→ 右はプレースホルダ)+ 末尾に右のみ D(→ 左はプレースホルダ)。
+    expect(visibleLeft.slice(0, 3)).toEqual(left);
+    expect(visibleRight[0]).toBe(right[0]);
+    expect(visibleRight[1]).toBe(right[1]);
+    expect(placeholders.right.has(visibleRight[2])).toBe(true);
+    expect(placeholders.left.has(visibleLeft[3])).toBe(true);
+    expect(visibleRight[3]).toBe(right[2]);
+    // プレースホルダは差分 Map に載らない(getDiff は undefined)。
+    expect(result.current.getDiff(visibleLeft[3])).toBeUndefined();
+  });
+
+  it('alignRows + showDiffOnly は対の単位でフィルタされ、整列が保たれる', () => {
+    const { result } = renderHook(() =>
+      useComparison<Row>({
+        left,
+        right,
+        getMatchKey,
+        compareFields: [{ key: 'qty', label: '数量' }],
+        alignRows: true,
+        showDiffOnly: true,
+      }),
+    );
+    const { visibleLeft, visibleRight, placeholders } = result.current;
+    // same の対(A)だけが消え、B(field-diff)/ C(left-only)/ D(right-only)の 3 対。
+    expect(visibleLeft).toHaveLength(3);
+    expect(visibleRight).toHaveLength(3);
+    expect(visibleLeft[0]).toBe(left[1]);
+    expect(visibleRight[0]).toBe(right[1]);
+    expect(visibleLeft[1]).toBe(left[2]);
+    expect(placeholders.right.has(visibleRight[1])).toBe(true);
+    expect(placeholders.left.has(visibleLeft[2])).toBe(true);
+    expect(visibleRight[2]).toBe(right[2]);
+  });
+
+  it('alignRows OFF では placeholders が空 Set', () => {
+    const { result } = renderHook(() =>
+      useComparison<Row>({
+        left,
+        right,
+        getMatchKey,
+        compareFields: [{ key: 'qty', label: '数量' }],
+      }),
+    );
+    expect(result.current.placeholders.left.size).toBe(0);
+    expect(result.current.placeholders.right.size).toBe(0);
+    expect(result.current.visibleLeft).toBe(left);
+  });
+
   it('getMatchKey / compareFields の中身が変わると再計算される', () => {
     const { result, rerender } = renderHook(
       (props: UseComparisonOptions<Row>) => useComparison<Row>(props),

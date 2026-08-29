@@ -2,9 +2,12 @@
 //   設計方針(サイドカー方式): 利用側の行 T には一切書き込まず、差分情報は行オブジェクトを
 //   キーにした Map(ComparisonDiffMap)で横持ちします。グリッドへは T[] をそのまま渡すため、
 //   利用側は GridColumn<T> / SpreadsheetGridProps<T> を「T の型のまま」書けます。
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, ReactNode, RefObject } from 'react';
 import type {
+  CellStyleContext,
   GridColumn,
+  ScrollAlign,
+  SpreadsheetGridHandle,
   SpreadsheetGridProps,
 } from '@ishibashi0112/spreadsheet-grid';
 
@@ -123,19 +126,53 @@ export type ComparisonResult<T> = {
   hasAnyDiff: boolean;
 };
 
+/** 左右整列モード(alignRows)で対になった 1 行。欠損側にはプレースホルダ行が入ります。 */
+export type ComparisonAlignedPair<T> = {
+  left: T;
+  right: T;
+};
+
+/** 各側の表示配列に挿入されたプレースホルダ行の集合(行オブジェクトの同一性で判定)。 */
+export type ComparisonPlaceholders<T> = {
+  left: ReadonlySet<T>;
+  right: ReadonlySet<T>;
+};
+
+export type AlignComparisonRowsOptions<T> = {
+  /** プレースホルダ行の生成。**呼び出しごとに新しいオブジェクト**を返すこと(同一性で判定するため)。
+   *  既定は空オブジェクト(`{} as T`。`row[key]` アクセスが undefined になり空セルとして描画される)。 */
+  createPlaceholderRow?: (side: ComparisonSide) => T;
+};
+
+/** alignComparisonRows() の戻り値。 */
+export type AlignComparisonRowsResult<T> = {
+  /** 突き合わせ順の対。左の行順を基準に、左に無い右行は右の行順で末尾に並ぶ。 */
+  pairs: ComparisonAlignedPair<T>[];
+  placeholders: ComparisonPlaceholders<T>;
+};
+
 export type UseComparisonOptions<T> = CompareOptions<T> & {
   left: readonly T[];
   right: readonly T[];
   /** 「差分のみ表示」の意思(state)。実効値は effectiveShowDiffOnly として導出されます。 */
   showDiffOnly?: boolean;
+  /** 左右整列モード(既定 false)。突き合わせ順に並べ、欠損側へプレースホルダ行を挿入して
+   *  左右の同じ行位置を同じ突き合わせ相手にします。visibleLeft / visibleRight は常に同じ長さになります。 */
+  alignRows?: boolean;
+  /** alignRows 時のプレースホルダ行生成(AlignComparisonRowsOptions と同じ)。
+   *  インライン関数は毎レンダー再整列になるため、コンポーネント外で定義してください。 */
+  createPlaceholderRow?: (side: ComparisonSide) => T;
 };
 
 export type UseComparisonResult<T> = ComparisonResult<T> & {
   /** 参照安定化済みの compareFields(ペインのセル強調に使用)。 */
   compareFields: readonly CompareField<T>[];
-  /** effectiveShowDiffOnly 適用後の表示行。フィルタ無しのときは入力配列と同一参照。 */
+  /** effectiveShowDiffOnly 適用後の表示行。フィルタ無し・alignRows OFF のときは入力配列と同一参照。
+   *  alignRows ON では整列済み配列(プレースホルダ行を含む)。 */
   visibleLeft: readonly T[];
   visibleRight: readonly T[];
+  /** alignRows で各側の表示配列に挿入されたプレースホルダ行(OFF のときは空 Set)。 */
+  placeholders: ComparisonPlaceholders<T>;
   hasBothSides: boolean;
   /** hasBothSides && showDiffOnly。 */
   effectiveShowDiffOnly: boolean;
@@ -145,11 +182,9 @@ export type UseComparisonResult<T> = ComparisonResult<T> & {
   getDiff: (row: T) => ComparisonRowDiff<T> | undefined;
 };
 
-/** GridColumn.cellClassName(関数版)が受け取るコンテキストです。spreadsheet-grid が CellStyleContext を
- *  バレルから公開していないため、列型から導出します(公開されたら差し替え予定)。 */
-export type GridCellStyleContext<T> = Parameters<
-  Exclude<NonNullable<GridColumn<T>['cellClassName']>, string>
->[0];
+/** GridColumn.cellClassName(関数版)が受け取るコンテキストです。spreadsheet-grid v0.29.0 で
+ *  公開された CellStyleContext の別名です(公開前は列型からの導出で代替していました)。 */
+export type GridCellStyleContext<T> = CellStyleContext<T>;
 
 /** ペインが SpreadsheetGrid へ透過する props。rows / columns / dataSource はライブラリが予約します。 */
 export type ComparisonGridProps<T> = Omit<
@@ -180,6 +215,108 @@ export type ComparisonDiffLabelColumnProps<T> = {
   diffLabelColumn?: DiffLabelColumnOptions<T>;
 };
 
+/** 差分ジャンプの 1 停止位置。index は visibleLeft / visibleRight 上の行位置。 */
+export type ComparisonDiffStop<T> = {
+  kind: Exclude<ComparisonDiffKind, 'same'>;
+  /** visibleLeft 上の行 index(この側に行が無い停止では undefined)。 */
+  leftIndex?: number;
+  /** visibleRight 上の行 index(同上)。 */
+  rightIndex?: number;
+  leftRow?: T;
+  rightRow?: T;
+};
+
+export type UseComparisonNavigationOptions<T> = {
+  /** useComparison の戻り値(visibleLeft / visibleRight / leftDiffs / rightDiffs を使用)。 */
+  comparison: Pick<
+    UseComparisonResult<T>,
+    'visibleLeft' | 'visibleRight' | 'leftDiffs' | 'rightDiffs'
+  >;
+  /** alignRows 利用時に true。片側のみの停止でも同じ行位置で両ペインをスクロールする。 */
+  alignRows?: boolean;
+  /** scrollToRow の align(既定 'center')。 */
+  align?: ScrollAlign;
+};
+
+export type UseComparisonNavigationResult<T> = {
+  /** 左ペインのグリッドへ `leftGridProps={{ ref: leftRef }}` で渡す。 */
+  leftRef: RefObject<SpreadsheetGridHandle<T> | null>;
+  /** 右ペインのグリッドへ `rightGridProps={{ ref: rightRef }}` で渡す。 */
+  rightRef: RefObject<SpreadsheetGridHandle<T> | null>;
+  /** 停止位置(visibleLeft の行順 → 左に無い右行は visibleRight の行順で末尾)。 */
+  diffStops: readonly ComparisonDiffStop<T>[];
+  diffCount: number;
+  /** 現在の停止位置(未移動は -1)。visibleLeft / visibleRight が変わるとリセットされる。 */
+  activeDiffIndex: number;
+  /** diffCount > 0。ボタンの disabled に。 */
+  canNavigate: boolean;
+  /** 指定位置へ(範囲外はラップ)。 */
+  goToDiff: (index: number) => void;
+  /** 次の差分へ(末尾からは先頭へ)。 */
+  goToNextDiff: () => void;
+  /** 前の差分へ(先頭・未移動からは末尾へ)。 */
+  goToPreviousDiff: () => void;
+};
+
+/** useManualRows の 1 エラー。rowIndex は rows(グリッド表示配列)上の位置。 */
+export type ManualRowError<T> = {
+  row: T;
+  rowIndex: number;
+  message: string;
+};
+
+export type UseManualRowsOptions<T> = {
+  /** 初期行(既定 `[]`)。末尾空行はフックが維持するため含めなくてよい。 */
+  initialRows?: readonly T[];
+  /** 空行の生成(グリッドの createRow と同じ。**毎回新しいオブジェクト**を返すこと)。 */
+  createRow: () => T;
+  /** 「空行」の判定。末尾空行の維持と dataRows の除外に使う。 */
+  isEmptyRow: (row: T) => boolean;
+  /** 変更時の正規化(トリム等)。**変更が不要なら受け取った row をそのまま返す**こと
+   *  (参照を保つとグリッドの編集状態 / undo と相性がよい)。 */
+  normalizeRow?: (row: T) => T;
+  /** 送信時検証。エラーメッセージを返す(空 / null / undefined で OK)。空行は評価しない。 */
+  validateRow?: (row: T, rowIndex: number) => string | null | undefined;
+  /** 維持する末尾空行数(既定 1)。0 で維持しない(末尾の空行は取り除かれる)。 */
+  trailingEmptyRows?: number;
+};
+
+export type UseManualRowsResult<T> = {
+  /** グリッドへ渡す行(末尾空行込み)。 */
+  rows: readonly T[];
+  /** 空行(途中の空行も含む)を除いた確定行。useComparison の left / right へ。 */
+  dataRows: readonly T[];
+  /** gridProps.onRowsChange へ(正規化 + 末尾空行の維持)。 */
+  onRowsChange: (nextRows: T[]) => void;
+  /** 行の外部差し替え(読み込み / リセット)。末尾空行の維持のみ行う(正規化はしない)。 */
+  setRows: (rows: readonly T[]) => void;
+  /** 全行クリア(空行だけの状態に戻す)。 */
+  clear: () => void;
+  /** validateRow の現在の結果。 */
+  errors: readonly ManualRowError<T>[];
+  /** errors.length === 0(送信可否に)。 */
+  isValid: boolean;
+  /** そのままスプレッドできる編集用 props(`gridProps={{ ...manual.gridProps, readOnly: false }}` 等)。 */
+  gridProps: {
+    onRowsChange: (nextRows: T[]) => void;
+    createRow: () => T;
+  };
+};
+
+/** getComparisonExportData() のオプション。 */
+export type ComparisonExportOptions<T> = {
+  /** エクスポートする行(`visibleLeft` / `annotatedLeft.map((e) => e.row)` / 整列済み配列など)。 */
+  rows: readonly T[];
+  /** この側の差分 Map(`leftDiffs` / `rightDiffs`)。 */
+  diffs: ComparisonDiffMap<T>;
+  /** 列定義。`visible: false` の列は除外される。 */
+  columns: readonly GridColumn<T>[];
+  /** 差分ラベル列を含める(既定 **true**。ペインの既定 false とは異なることに注意)。 */
+  showDiffLabelColumn?: boolean;
+  /** ラベル列の調整(`key` / `title` / `position` を使用)。 */
+  diffLabelColumn?: DiffLabelColumnOptions<T>;
+};
+
 export type ComparisonPaneProps<T extends object> = ComparisonHighlightOptions &
   ComparisonDiffLabelColumnProps<T> & {
     side: ComparisonSide;
@@ -190,6 +327,8 @@ export type ComparisonPaneProps<T extends object> = ComparisonHighlightOptions &
     compareFields?: readonly CompareField<T>[];
     /** 突き合わせキー相当の列キー(left-only / right-only 行で強調)。 */
     keyColumnKeys?: readonly string[];
+    /** この側の rows に含まれるプレースホルダ行(.cmpg-row-placeholder を付与)。 */
+    placeholderRows?: ReadonlySet<T>;
     header?: ReactNode;
     /** ヘッダースロットの描画。既定は header !== undefined。 */
     showHeader?: boolean;
@@ -198,17 +337,21 @@ export type ComparisonPaneProps<T extends object> = ComparisonHighlightOptions &
     style?: CSSProperties;
   };
 
-/** ComparisonView が useComparison の結果から使う部分。 */
+/** ComparisonView が useComparison の結果から使う部分。placeholders は alignRows 利用時のみ必要。 */
 export type ComparisonViewModel<T> = Pick<
   UseComparisonResult<T>,
   'visibleLeft' | 'visibleRight' | 'leftDiffs' | 'rightDiffs' | 'compareFields'
->;
+> &
+  Partial<Pick<UseComparisonResult<T>, 'placeholders'>>;
 
 export type ComparisonViewProps<T extends object> = ComparisonHighlightOptions &
   ComparisonDiffLabelColumnProps<T> & {
     comparison: ComparisonViewModel<T>;
     columns: readonly GridColumn<T>[];
     keyColumnKeys?: readonly string[];
+    /** 左右ペインの縦スクロールを同期する(既定 false)。alignRows との併用を想定。
+     *  source が 'user' のスクロールだけを相手ペインへ伝え、'api' 由来は無視してループを防ぎます。 */
+    enableScrollSync?: boolean;
     leftHeader?: ReactNode;
     rightHeader?: ReactNode;
     /** 両ペイン共通の grid props。 */

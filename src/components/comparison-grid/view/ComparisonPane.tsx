@@ -28,6 +28,7 @@ export function ComparisonPane<T extends object>(props: ComparisonPaneProps<T>) 
     enableFieldCellHighlight = true,
     showDiffLabelColumn = false,
   } = props;
+  const { placeholderRows } = props;
   const columns = useStableArray(props.columns);
   const compareFields = useStableArray(props.compareFields);
   const keyColumnKeys = useStableArray(props.keyColumnKeys);
@@ -54,8 +55,8 @@ export function ComparisonPane<T extends object>(props: ComparisonPaneProps<T>) 
 
   const userGetRowClassName = gridProps?.getRowClassName;
   const getRowClassName = useMemo(
-    () => composeRowClassName(diffs, userGetRowClassName, enableRowHighlight),
-    [diffs, userGetRowClassName, enableRowHighlight],
+    () => composeRowClassName(diffs, userGetRowClassName, enableRowHighlight, placeholderRows),
+    [diffs, userGetRowClassName, enableRowHighlight, placeholderRows],
   );
 
   return (
@@ -68,9 +69,7 @@ export function ComparisonPane<T extends object>(props: ComparisonPaneProps<T>) 
       <div className="cmpg-pane-body">
         <SpreadsheetGrid<T>
           {...gridProps}
-          // 注記: SpreadsheetGridProps.rows は T[](mutable)のため readonly からキャストします。
-          //   グリッドは rows を変更しません(編集は onRowsChange で新配列を返す設計)。
-          rows={rows as T[]}
+          rows={rows}
           columns={composedColumns}
           getRowClassName={getRowClassName}
           className={cx('cmpg-grid', gridProps?.className)}

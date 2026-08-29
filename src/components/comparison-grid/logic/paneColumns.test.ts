@@ -1,6 +1,6 @@
 // 列定義 / 行クラスの合成ロジックの単体テストです(node 環境)。
 import { describe, it, expect } from 'vitest';
-import type { GridColumn } from '@ishibashi0112/spreadsheet-grid';
+import type { GridColumn, RowStyleContext } from '@ishibashi0112/spreadsheet-grid';
 import { compare } from './compare';
 import {
   CMPG_CLASS_NAMES,
@@ -51,6 +51,14 @@ const cellClass = (col: GridColumn<Row>, r: Row): string | undefined => {
   const fn = col.cellClassName;
   return typeof fn === 'function' ? fn(ctxOf(r, col)) : fn;
 };
+
+const rowCtxOf = (r: Row, rowIndex: number): RowStyleContext<Row> => ({
+  row: r,
+  rowIndex,
+  sourceRowIndex: rowIndex,
+  rowKey: rowIndex,
+  isSelected: false,
+});
 
 describe('getDiffRowClassName / getDiffCellClassName', () => {
   it('行クラスは same / 未知の行では undefined、それ以外は種別修飾子つき', () => {
@@ -141,15 +149,39 @@ describe('composeRowClassName', () => {
   it('ライブラリの行クラスと利用側 getRowClassName を合成する', () => {
     const user = (r: Row) => (r.id === 'B' ? 'user-b' : undefined);
     const fn = composeRowClassName(result.leftDiffs, user, true);
-    expect(fn?.(left[0], 0)).toBeUndefined();
-    expect(fn?.(left[1], 1)).toBe('cmpg-row-diff cmpg-row-diff--field user-b');
-    expect(fn?.(left[2], 2)).toBe('cmpg-row-diff cmpg-row-diff--left-only');
+    expect(fn?.(left[0], 0, rowCtxOf(left[0], 0))).toBeUndefined();
+    expect(fn?.(left[1], 1, rowCtxOf(left[1], 1))).toBe('cmpg-row-diff cmpg-row-diff--field user-b');
+    expect(fn?.(left[2], 2, rowCtxOf(left[2], 2))).toBe('cmpg-row-diff cmpg-row-diff--left-only');
   });
 
   it('enableRowHighlight=false は利用側の関数をそのまま返す', () => {
     const user = () => 'x';
     expect(composeRowClassName(result.leftDiffs, user, false)).toBe(user);
     expect(composeRowClassName(result.leftDiffs, undefined, false)).toBeUndefined();
+  });
+
+  it('placeholderRows の行には .cmpg-row-placeholder が付き、差分クラスは付かない', () => {
+    const placeholder = row('__ph', 0);
+    const placeholders: ReadonlySet<Row> = new Set([placeholder]);
+    const fn = composeRowClassName(result.leftDiffs, undefined, true, placeholders);
+    expect(fn?.(placeholder, 3, rowCtxOf(placeholder, 3))).toBe(CMPG_CLASS_NAMES.rowPlaceholder);
+    // 差分行はこれまでどおり。
+    expect(fn?.(left[1], 1, rowCtxOf(left[1], 1))).toBe('cmpg-row-diff cmpg-row-diff--field');
+  });
+
+  it('enableRowHighlight=false でもプレースホルダ行クラスは付与され、利用側と合成される', () => {
+    const placeholder = row('__ph', 0);
+    const placeholders: ReadonlySet<Row> = new Set([placeholder]);
+    const user = () => 'user-class';
+    const fn = composeRowClassName(result.leftDiffs, user, false, placeholders);
+    expect(fn).not.toBe(user);
+    expect(fn?.(placeholder, 0, rowCtxOf(placeholder, 0))).toBe(
+      `${CMPG_CLASS_NAMES.rowPlaceholder} user-class`,
+    );
+    // 差分行には差分クラスが付かない(ハイライト無効)。
+    expect(fn?.(left[1], 1, rowCtxOf(left[1], 1))).toBe('user-class');
+    // 空 Set なら従来どおり利用側の関数をそのまま返す。
+    expect(composeRowClassName(result.leftDiffs, user, false, new Set<Row>())).toBe(user);
   });
 });
 

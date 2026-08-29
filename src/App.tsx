@@ -6,6 +6,7 @@ import type { GridColumn, GridTheme } from '@ishibashi0112/spreadsheet-grid';
 import {
   ComparisonView,
   useComparison,
+  useComparisonNavigation,
   type CompareField,
   type ComparisonGridProps,
 } from './components/comparison-grid';
@@ -25,7 +26,10 @@ const getReprItemPathKey = (row: BomRow) =>
   row.itemPath.replace(row.itemCode, row.reprItemCode || row.itemCode);
 
 // Level 列: 階層の深さに応じて左インデントを付けて表示する。
+//   左右整列(alignRows)のプレースホルダ行は空オブジェクトで来るため、renderCell を持つ列は
+//   ここで空表示に落とす(既定の getValue 列は undefined → 空セルになるので対応不要)。
 const renderLevelCell = ({ row }: { row: BomRow }) => {
+  if (!row.levelNo) return null;
   const level = Math.max(row.levelNo, 1);
   return (
     <div className="demo-level-cell" style={{ paddingLeft: `${(level - 1) * 12}px` }}>
@@ -41,15 +45,16 @@ const detailColumn: GridColumn<BomRow> = {
   width: 64,
   pinned: 'right',
   suppressAutoSize: true,
-  renderCell: ({ row }) => (
-    <button
-      type="button"
-      className="demo-detail-button"
-      onClick={() => window.alert(`品目マスタを開く: ${row.itemCode}`)}
-    >
-      品目M
-    </button>
-  ),
+  renderCell: ({ row }) =>
+    row.itemCode ? (
+      <button
+        type="button"
+        className="demo-detail-button"
+        onClick={() => window.alert(`品目マスタを開く: ${row.itemCode}`)}
+      >
+        品目M
+      </button>
+    ) : null,
 };
 
 // 2. 列定義: 利用側の型 T に対する GridColumn をそのまま書く。
@@ -88,17 +93,25 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [showDiffOnly, setShowDiffOnly] = useState(false);
   const [isReprItemMode, setIsReprItemMode] = useState(false);
+  const [alignRows, setAlignRows] = useState(false);
+  const [syncScroll, setSyncScroll] = useState(false);
   const [theme, setTheme] = useState<GridTheme>('light');
+  const [cvdColors, setCvdColors] = useState(false);
   const [enableGridFeatures, setEnableGridFeatures] = useState(false);
 
   // 3. 比較: キーの取り方と差分フィールドを渡すだけ。実効的な「差分のみ」はフック側で導出される。
+  //    alignRows は左右を突き合わせ順の同じ長さに揃える(欠損側はプレースホルダ行)。
   const comparison = useComparison<BomRow>({
     left: leftRows,
     right: rightRows,
     getMatchKey: isReprItemMode ? getReprItemPathKey : getItemPathKey,
     compareFields: COMPARE_FIELDS,
     showDiffOnly,
+    alignRows,
   });
+
+  // 差分ジャンプ: グリッドのハンドル ref はフックが生成し、leftGridProps / rightGridProps で配線する。
+  const navigation = useComparisonNavigation<BomRow>({ comparison, alignRows });
 
   // SpreadsheetGrid の props はそのまま透過できる(ソート / フィルター等の機能もここで有効化)。
   const gridProps = useMemo<ComparisonGridProps<BomRow>>(
@@ -117,6 +130,16 @@ export default function App() {
       enableUndoRedo: false,
     }),
     [theme, enableGridFeatures],
+  );
+
+  // 差分ジャンプ用のハンドル ref を片側ずつ渡す(enableScrollSync の内部 ref とは合成される)。
+  const leftGridProps = useMemo<ComparisonGridProps<BomRow>>(
+    () => ({ ref: navigation.leftRef }),
+    [navigation.leftRef],
+  );
+  const rightGridProps = useMemo<ComparisonGridProps<BomRow>>(
+    () => ({ ref: navigation.rightRef }),
+    [navigation.rightRef],
   );
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -192,6 +215,22 @@ export default function App() {
           <label className="demo-toggle">
             <input
               type="checkbox"
+              checked={alignRows}
+              onChange={(event) => setAlignRows(event.target.checked)}
+            />
+            左右整列
+          </label>
+          <label className="demo-toggle">
+            <input
+              type="checkbox"
+              checked={syncScroll}
+              onChange={(event) => setSyncScroll(event.target.checked)}
+            />
+            スクロール同期
+          </label>
+          <label className="demo-toggle">
+            <input
+              type="checkbox"
               checked={enableGridFeatures}
               onChange={(event) => setEnableGridFeatures(event.target.checked)}
             />
@@ -205,6 +244,35 @@ export default function App() {
               <option value="auto">auto</option>
             </select>
           </label>
+          <label className="demo-toggle">
+            <input
+              type="checkbox"
+              checked={cvdColors}
+              onChange={(event) => setCvdColors(event.target.checked)}
+            />
+            色覚多様性配色
+          </label>
+          <button
+            type="button"
+            className="demo-button"
+            onClick={navigation.goToPreviousDiff}
+            disabled={!navigation.canNavigate}
+          >
+            ◀ 前の差分
+          </button>
+          <button
+            type="button"
+            className="demo-button"
+            onClick={navigation.goToNextDiff}
+            disabled={!navigation.canNavigate}
+          >
+            次の差分 ▶
+          </button>
+          <span className="demo-toggle">
+            {navigation.activeDiffIndex >= 0
+              ? `${navigation.activeDiffIndex + 1} / ${navigation.diffCount}`
+              : `差分 ${navigation.diffCount} 件`}
+          </span>
         </form>
         {hasData ? (
           <p className="demo-summary">
@@ -225,12 +293,16 @@ export default function App() {
         <ComparisonView<BomRow>
           comparison={comparison}
           columns={columns}
+          className={cvdColors ? 'cmpg-colors-cvd' : undefined}
           keyColumnKeys={['itemCode']}
           showDiffLabelColumn
           diffLabelColumn={{ title: '変更箇所', width: 130 }}
+          enableScrollSync={syncScroll}
           leftHeader={<PaneHeader info={toRootItemInfo(leftRows)} />}
           rightHeader={<PaneHeader info={toRootItemInfo(rightRows)} />}
           gridProps={gridProps}
+          leftGridProps={leftGridProps}
+          rightGridProps={rightGridProps}
         />
       </main>
     </div>

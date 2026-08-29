@@ -6,10 +6,14 @@ export {
   formatDefaultDiffLabel,
   DEFAULT_COMPARISON_LABELS,
 } from './logic/compare';
+export { alignComparisonRows } from './logic/alignRows';
+export { getComparisonExportData } from './logic/exportData';
 // ライブラリが付与するクラス名と差分ラベル列の既定キー(利用側 CSS / テスト向け)。
 export { CMPG_CLASS_NAMES, DEFAULT_DIFF_LABEL_COLUMN_KEY } from './logic/paneColumns';
 // React 層。
 export { useComparison } from './hooks/useComparison';
+export { useComparisonNavigation } from './hooks/useComparisonNavigation';
+export { useManualRows } from './hooks/useManualRows';
 export { ComparisonPane } from './view/ComparisonPane';
 export { ComparisonView } from './view/ComparisonView';
 
@@ -28,8 +32,19 @@ export type {
   ComparisonDuplicateKeys,
   ComparisonDiffMap,
   ComparisonResult,
+  ComparisonAlignedPair,
+  ComparisonPlaceholders,
+  AlignComparisonRowsOptions,
+  AlignComparisonRowsResult,
+  ComparisonExportOptions,
   UseComparisonOptions,
   UseComparisonResult,
+  ComparisonDiffStop,
+  UseComparisonNavigationOptions,
+  UseComparisonNavigationResult,
+  ManualRowError,
+  UseManualRowsOptions,
+  UseManualRowsResult,
   GridCellStyleContext,
   ComparisonGridProps,
   ComparisonHighlightOptions,

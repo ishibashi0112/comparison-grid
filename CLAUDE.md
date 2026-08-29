@@ -6,7 +6,7 @@
 
 - React 19 / TypeScript 6 / Vite 8。ツールチェーンは vite+(`vp` コマンド)。pnpm 11.12.0(`packageManager` で固定)。
 - Vitest 4(`pnpm-workspace.yaml` の overrides で vp 同梱バージョンへ pin)。jsdom は `.test.tsx` のみ(先頭 docblock `// @vitest-environment jsdom`)。
-- peer: `react` / `react-dom` `^19`、`@ishibashi0112/spreadsheet-grid` `>=0.28.1 <1.0.0`(0.x で minor が頻繁に上がるため `^` を使わない)。
+- peer: `react` / `react-dom` `^19`、`@ishibashi0112/spreadsheet-grid` `>=0.29.0 <1.0.0`(0.x で minor が頻繁に上がるため `^` を使わない)。
 - 構成は spreadsheet-grid リポジトリ(`~/dev/datasheet-grid`)を踏襲: ライブラリ本体は `src/components/comparison-grid/`、ルートは playground デモ(`src/App.tsx`)、配布物は `vite.lib.config.ts` + `tsconfig.lib.json` で `dist/` に生成。
 
 ## 厳守事項
@@ -43,15 +43,19 @@
 src/components/comparison-grid/
   model/types.ts        公開型(API_REFERENCE.md と対応)
   logic/compare.ts      純ロジック: 突き合わせ + 差分判定 + ラベル生成(React 非依存)
+  logic/alignRows.ts    純ロジック: 左右整列(プレースホルダ行の挿入)
   logic/paneColumns.ts  純ロジック: 列定義 / 行クラスの合成、差分ラベル列
+  logic/exportData.ts   純ロジック: エクスポートデータ生成(getExportData() と同形)
   logic/cx.ts           className 連結
   hooks/useStableValue.ts 参照安定化(浅い構造比較)
-  hooks/useComparison.ts  compare() の React 接続、差分のみフィルタの導出
+  hooks/useComparison.ts  compare() の React 接続、alignRows / 差分のみフィルタの導出
+  hooks/useComparisonNavigation.ts 差分ジャンプ(次 / 前の差分行へスクロール)
+  hooks/useManualRows.ts  マニュアル入力(末尾空行維持 / 正規化 / 送信時検証)
   view/ComparisonPane.tsx 片側 1 ペイン(SpreadsheetGrid ラッパー)
-  view/ComparisonView.tsx 2 ペインレイアウト
+  view/ComparisonView.tsx 2 ペインレイアウト + スクロール同期(enableScrollSync)
   styles.css            .cmpg-* クラス + --cmpg-* トークン(未レイヤー / :where)
   index.ts              公開バレル
 src/App.tsx / src/demo/  ss2602(部品構成比較)再現デモ
 ```
 
-- jsdom で実グリッドの行 / セルを描画させるには、`view/ComparisonView.test.tsx` の `beforeAll` のスタブ(`clientHeight` / `clientWidth` / `getBoundingClientRect` / **observe 時に即時発火する ResizeObserver**)が必要。no-op の ResizeObserver だと列が 1 本も描画されない。
+- jsdom で実グリッドの行 / セルを描画させるには、`@ishibashi0112/spreadsheet-grid/testing` の `installJsdomLayoutStubs()`(v0.29.0〜)を `beforeAll` で呼ぶ(`view/ComparisonView.test.tsx` 参照。返り値のアンインストーラを `afterAll` で呼ぶ)。no-op の ResizeObserver だと列が 1 本も描画されない。

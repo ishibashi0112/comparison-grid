@@ -18,6 +18,23 @@
 | 7 | `title: ''` の列見出しが `key` にフォールバックする挙動 | 仕様明確化 / 小修正 | 低 | 挙動変更(要判断) |
 | 8 | スクロール位置の取得 / 設定 / 通知 API | 機能追加 | 低(Phase 2 で必要) | 追加のみ |
 
+## 採用結果(2026-08-29 追記)
+
+spreadsheet-grid **v0.29.0**(コミット「proposals batch 1〜6」・2026-08-29 npm 公開)で全 8 件が処理された。
+
+| # | 結果 | 内容 |
+| --- | --- | --- |
+| 1 | ✅ 採用(batch 1) | `CellStyleContext`(および `RowStyleContext`)をバレルから公開 |
+| 2 | ✅ 採用(batch 2) | `rows` / `columns` / `filterOptions` を readonly 配列で受け付け |
+| 3 | ✅ 採用(batch 5) | `/testing` サブパスで `installJsdomLayoutStubs({ width?, height? })` を公開(既定 1200×600・scrollTo スタブ含む・restore 関数を返す)。API_REFERENCE「Testing(jsdom)」節 + website ガイド付き |
+| 4 | 変更なし(既存で充足) | 既存の `rowKeyGetter?: (row, index) => GridRowKey` prop が該当(0.28.1 時点で存在し `RowModel.getRowKey` / `cellClassName` の `ctx.rowKey` に配線済み)。本提案書の「現状」認識が誤りだった |
+| 5 | ✅ 採用(batch 3) | `getRowClassName` に第 3 引数 `ctx: RowStyleContext<T>`(`row` / `rowIndex` / `sourceRowIndex` / `rowKey` / `isSelected`。提案の `isGroupRow` は含まれない) |
+| 6 | ✅ 採用(batch 4) | API_REFERENCE / website に「スタイリング用の状態クラス(公開契約)」節(変更時 breaking 扱い) |
+| 7 | ✅ (b) 採用(batch 4) | 挙動は現状維持のうえ、`title` 未指定 / 空文字時の `key` フォールバックを API_REFERENCE に明記((a) の `title ?? key` 化は別途検討) |
+| 8 | ✅ 採用(batch 6) | `handle.getScrollPosition()`(未マウント時 `null`)/ `handle.setScrollPosition()`(クランプあり)/ `props.onScroll`(rAF 間引き・`source: 'user' \| 'api'`) |
+
+採用時の comparison-grid 側の対応は同日反映済み: #1 `GridCellStyleContext<T>` を `CellStyleContext<T>` の別名に変更、#2 `ComparisonPane` の `rows as T[]` キャスト削除、#3 `ComparisonView.test.tsx` の自前スタブを `installJsdomLayoutStubs()` へ置換、peer 範囲を `>=0.29.0 <1.0.0` へ更新。#8 により Phase 2「左右整列モード」のスクロール同期が実装可能になった。
+
 ---
 
 ## 1. `CellStyleContext` をバレルから公開する

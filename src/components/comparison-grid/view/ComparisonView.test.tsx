@@ -3,67 +3,25 @@
 //   - 差分行クラス(.cmpg-row-diff)/ キー列セル / 差分フィールドセル / 差分ラベル列
 //   - enable* の無効化と利用側 getRowClassName / cellClassName との共存
 // @vitest-environment jsdom
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import type { GridColumn } from '@ishibashi0112/spreadsheet-grid';
+import { installJsdomLayoutStubs } from '@ishibashi0112/spreadsheet-grid/testing';
 import { ComparisonView } from './ComparisonView';
 import { useComparison } from '../hooks/useComparison';
 import type { CompareField, ComparisonViewProps, UseComparisonOptions } from '../model/types';
 
-// jsdom には ResizeObserver / Element.scrollTo が無い(SpreadsheetGrid がマウント時に使う)ため最小スタブ。
-//   また jsdom はレイアウトを持たず clientHeight / clientWidth / getBoundingClientRect が 0 のため、
-//   仮想化された本体行が 1 行も描画されません。ビューポート寸法を固定値で返すスタブを入れて
-//   実グリッドに行 / セルを描画させ、ハイライトの配線を DOM で検証します。
+// jsdom はレイアウトを持たないため、素のままでは仮想化された行 / 列が 1 本も描画されません。
+//   spreadsheet-grid v0.29.0 の公式スタブでビューポート寸法(既定 1200×600)と
+//   observe 時に即時発火する ResizeObserver を与え、実グリッドに行 / セルを描画させて
+//   ハイライトの配線を DOM で検証します。
+let uninstallLayoutStubs: (() => void) | undefined;
 beforeAll(() => {
-  Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
-    configurable: true,
-    get: () => 600,
-  });
-  Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
-    configurable: true,
-    get: () => 1200,
-  });
-  Element.prototype.getBoundingClientRect = () =>
-    ({
-      x: 0,
-      y: 0,
-      top: 0,
-      left: 0,
-      bottom: 600,
-      right: 1200,
-      width: 1200,
-      height: 600,
-      toJSON: () => ({}),
-    }) as DOMRect;
-  // 列仮想化(@tanstack/react-virtual)はスクロール要素の矩形を ResizeObserver の通知から得るため、
-  //   observe 時に固定寸法で即時コールバックするスタブを入れます(no-op だと列が 1 本も描画されません)。
-  type ResizeObserverCallbackLike = (entries: unknown[], observer: unknown) => void;
-  class ResizeObserverStub {
-    private readonly callback: ResizeObserverCallbackLike;
-    constructor(callback: ResizeObserverCallbackLike) {
-      this.callback = callback;
-    }
-    observe(target: Element): void {
-      const size = { inlineSize: 1200, blockSize: 600 };
-      this.callback(
-        [
-          {
-            target,
-            contentRect: { width: 1200, height: 600, top: 0, left: 0 },
-            borderBoxSize: [size],
-            contentBoxSize: [size],
-          },
-        ],
-        this,
-      );
-    }
-    unobserve(): void {}
-    disconnect(): void {}
-  }
-  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = ResizeObserverStub;
-  if (!Element.prototype.scrollTo) {
-    Element.prototype.scrollTo = () => {};
-  }
+  uninstallLayoutStubs = installJsdomLayoutStubs();
+});
+
+afterAll(() => {
+  uninstallLayoutStubs?.();
 });
 
 afterEach(() => {
@@ -90,13 +48,14 @@ const right = [row('A', 1), row('B', 2), row('D', 1)];
 type HarnessProps = Partial<UseComparisonOptions<Row>> &
   Omit<ComparisonViewProps<Row>, 'comparison' | 'columns'>;
 
-function Harness({ showDiffOnly, ...viewProps }: HarnessProps) {
+function Harness({ showDiffOnly, alignRows, ...viewProps }: HarnessProps) {
   const comparison = useComparison<Row>({
     left,
     right,
     getMatchKey: (r) => r.id,
     compareFields,
     showDiffOnly,
+    alignRows,
   });
   return <ComparisonView<Row> comparison={comparison} columns={columns} {...viewProps} />;
 }
@@ -169,6 +128,35 @@ describe('ComparisonView', () => {
     );
     expect(container.querySelectorAll('.cmpg-row-diff')).toHaveLength(0);
     expect(container.querySelectorAll('.cmpg-cell-diff')).toHaveLength(0);
+  });
+
+  it('alignRows でプレースホルダ行が .cmpg-row-placeholder つきの空行として描画される', () => {
+    const { container } = render(<Harness alignRows showDiffLabelColumn />);
+    // 左: A / B / C + プレースホルダ(右のみ D の相手)。右: A / B + プレースホルダ(C の相手)+ D。
+    const leftPlaceholderCells = cellsIn(container, 'left', '.ssg-body-cell.cmpg-row-placeholder');
+    const rightPlaceholderCells = cellsIn(container, 'right', '.ssg-body-cell.cmpg-row-placeholder');
+    expect(leftPlaceholderCells.length).toBeGreaterThan(0);
+    expect(rightPlaceholderCells.length).toBeGreaterThan(0);
+    // プレースホルダのセルは空(差分ラベル列も含む)で、差分クラスは付かない。
+    expect(cellTexts(leftPlaceholderCells).every((t) => t === '')).toBe(true);
+    expect(leftPlaceholderCells.every((el) => !el.classList.contains('cmpg-row-diff'))).toBe(true);
+    // 両ペインの本体行数が一致する(左 3 + 1 / 右 3 + 1)。
+    expect(cellsIn(container, 'left', '.ssg-body-row')).toHaveLength(4);
+    expect(cellsIn(container, 'right', '.ssg-body-row')).toHaveLength(4);
+  });
+
+  it('alignRows + showDiffOnly は same の対だけが両ペインから消える', () => {
+    const { container } = render(<Harness alignRows showDiffOnly keyColumnKeys={['id']} />);
+    expect(cellsIn(container, 'left', '.ssg-body-row')).toHaveLength(3);
+    expect(cellsIn(container, 'right', '.ssg-body-row')).toHaveLength(3);
+    const leftIds = cellTexts(cellsIn(container, 'left', '.ssg-body-cell')).filter((t) =>
+      ['A', 'B', 'C', 'D'].includes(t ?? ''),
+    );
+    expect(leftIds).toEqual(['B', 'C']);
+    const rightIds = cellTexts(cellsIn(container, 'right', '.ssg-body-cell')).filter((t) =>
+      ['A', 'B', 'C', 'D'].includes(t ?? ''),
+    );
+    expect(rightIds).toEqual(['B', 'D']);
   });
 
   it('利用側の getRowClassName / className と共存する', () => {
