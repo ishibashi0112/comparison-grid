@@ -15,6 +15,7 @@ Side-by-side **two-list comparison** for **React 19**, built on top of [`@ishiba
 - **Headless diff core** — `compare()` is a pure, React-free function (Map-based `O(n + m)`). Rows are never mutated: diffs live in a side map keyed by row object, so your `T` stays exactly `T`.
 - **Four diff kinds** — `same` / `left-only` / `right-only` / `field-diff`, with a generated label (`"左のみ"`, `"数量・支給区分違い"`, …) that you can reword or replace.
 - **`useComparison()`** — derives `visibleLeft` / `visibleRight` (diff-only filter), `effectiveShowDiffOnly` (never `true` when one side is empty), `canShowDiffOnly` (for disabling the toggle), per-side counts and duplicate-key reports.
+- **Aligned mode (`alignRows`)** — both panes get the same length in match order, with placeholder rows (styled `.cmpg-row-placeholder`) inserted on the missing side; the diff-only filter works per pair so alignment is preserved.
 - **`ComparisonView` / `ComparisonPane`** — two `SpreadsheetGrid`s with row highlight, key-column highlight for one-sided rows, field-cell highlight for differing values, and an optional auto-inserted diff-label column. You write plain `GridColumn<T>[]`; the library composes its classes with yours.
 - **Every grid feature stays available** — `gridProps` passes `SpreadsheetGridProps<T>` through (sorting, filters, theme, density, context menu, imperative `ref`…). Only `rows` / `columns` / `dataSource` are reserved.
 - **Themeable** — colors and gaps are CSS custom properties (`--cmpg-*`) defined at zero specificity; a dark preset follows `theme="dark"` automatically. Unlayered CSS plus a `style.layer.css` variant for Tailwind v4 cascade layers.
@@ -239,6 +240,7 @@ MIT
 - **headless な差分コア** — `compare()` は React 非依存の純関数(Map による `O(n + m)`)。行には一切書き込まず、差分は行オブジェクトをキーにした横持ちの Map で返すため、利用側の `T` は `T` のままです。
 - **4 種類の差分** — `same` / `left-only` / `right-only` / `field-diff` と、生成ラベル(`"左のみ"`、`"数量・支給区分違い"` など)。文言の差し替え / 完全カスタムが可能。
 - **`useComparison()`** — `visibleLeft` / `visibleRight`(差分のみフィルタ)、`effectiveShowDiffOnly`(片側が空なら常に `false`)、`canShowDiffOnly`(トグルの無効化条件)、片側ごとの件数、キー重複の報告を導出します。
+- **左右整列モード(`alignRows`)** — 両ペインを突き合わせ順の同じ長さに揃え、欠損側へプレースホルダ行(`.cmpg-row-placeholder`)を挿入。「差分のみ」は対の単位でフィルタされ、整列が保たれます。
 - **`ComparisonView` / `ComparisonPane`** — 2 つの `SpreadsheetGrid` に、差分行ハイライト / 片側のみ行のキー列強調 / 差分フィールドセルの強調 / 差分ラベル列(任意)を配線。利用側は素の `GridColumn<T>[]` を書くだけで、ライブラリのクラスは利用側のクラスと合成されます。
 - **グリッドの全機能をそのまま利用可** — `gridProps` で `SpreadsheetGridProps<T>` を透過(ソート / フィルター / テーマ / 密度 / コンテキストメニュー / 命令的 `ref` …)。予約するのは `rows` / `columns` / `dataSource` だけ。
 - **テーマ対応** — 色と余白は特異度 0 で定義した CSS 変数(`--cmpg-*`)。`theme="dark"` に自動追従するダークプリセット付き。未レイヤー CSS と、Tailwind v4 向けの `style.layer.css` の二本立て。

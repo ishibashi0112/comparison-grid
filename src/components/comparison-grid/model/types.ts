@@ -154,14 +154,23 @@ export type UseComparisonOptions<T> = CompareOptions<T> & {
   right: readonly T[];
   /** 「差分のみ表示」の意思(state)。実効値は effectiveShowDiffOnly として導出されます。 */
   showDiffOnly?: boolean;
+  /** 左右整列モード(既定 false)。突き合わせ順に並べ、欠損側へプレースホルダ行を挿入して
+   *  左右の同じ行位置を同じ突き合わせ相手にします。visibleLeft / visibleRight は常に同じ長さになります。 */
+  alignRows?: boolean;
+  /** alignRows 時のプレースホルダ行生成(AlignComparisonRowsOptions と同じ)。
+   *  インライン関数は毎レンダー再整列になるため、コンポーネント外で定義してください。 */
+  createPlaceholderRow?: (side: ComparisonSide) => T;
 };
 
 export type UseComparisonResult<T> = ComparisonResult<T> & {
   /** 参照安定化済みの compareFields(ペインのセル強調に使用)。 */
   compareFields: readonly CompareField<T>[];
-  /** effectiveShowDiffOnly 適用後の表示行。フィルタ無しのときは入力配列と同一参照。 */
+  /** effectiveShowDiffOnly 適用後の表示行。フィルタ無し・alignRows OFF のときは入力配列と同一参照。
+   *  alignRows ON では整列済み配列(プレースホルダ行を含む)。 */
   visibleLeft: readonly T[];
   visibleRight: readonly T[];
+  /** alignRows で各側の表示配列に挿入されたプレースホルダ行(OFF のときは空 Set)。 */
+  placeholders: ComparisonPlaceholders<T>;
   hasBothSides: boolean;
   /** hasBothSides && showDiffOnly。 */
   effectiveShowDiffOnly: boolean;
@@ -214,6 +223,8 @@ export type ComparisonPaneProps<T extends object> = ComparisonHighlightOptions &
     compareFields?: readonly CompareField<T>[];
     /** 突き合わせキー相当の列キー(left-only / right-only 行で強調)。 */
     keyColumnKeys?: readonly string[];
+    /** この側の rows に含まれるプレースホルダ行(.cmpg-row-placeholder を付与)。 */
+    placeholderRows?: ReadonlySet<T>;
     header?: ReactNode;
     /** ヘッダースロットの描画。既定は header !== undefined。 */
     showHeader?: boolean;
@@ -222,11 +233,12 @@ export type ComparisonPaneProps<T extends object> = ComparisonHighlightOptions &
     style?: CSSProperties;
   };
 
-/** ComparisonView が useComparison の結果から使う部分。 */
+/** ComparisonView が useComparison の結果から使う部分。placeholders は alignRows 利用時のみ必要。 */
 export type ComparisonViewModel<T> = Pick<
   UseComparisonResult<T>,
   'visibleLeft' | 'visibleRight' | 'leftDiffs' | 'rightDiffs' | 'compareFields'
->;
+> &
+  Partial<Pick<UseComparisonResult<T>, 'placeholders'>>;
 
 export type ComparisonViewProps<T extends object> = ComparisonHighlightOptions &
   ComparisonDiffLabelColumnProps<T> & {

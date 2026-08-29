@@ -25,6 +25,8 @@ export const CMPG_CLASS_NAMES = {
   cellKeyDiff: 'cmpg-cell-diff--key',
   /** field-diff 行の差分フィールド列セル。 */
   cellFieldDiff: 'cmpg-cell-diff--field',
+  /** alignRows で欠損側に入るプレースホルダ行(行コンテナ + 各データセル)。 */
+  rowPlaceholder: 'cmpg-row-placeholder',
 } as const;
 
 /** 差分ラベル列の既定キー。 */
@@ -136,15 +138,22 @@ export type RowClassNameGetter<T> = (
   ctx: RowStyleContext<T>,
 ) => string | undefined;
 
-/** ライブラリの行クラスと利用側 getRowClassName を合成します(ctx は利用側へ透過)。 */
+/** ライブラリの行クラス(差分 / プレースホルダ)と利用側 getRowClassName を合成します(ctx は利用側へ透過)。
+ *  プレースホルダ行クラスは差分ハイライトではないため enableRowHighlight に依らず付与します。 */
 export const composeRowClassName = <T>(
   diffs: ComparisonDiffMap<T>,
   userGetRowClassName: RowClassNameGetter<T> | undefined,
   enableRowHighlight: boolean,
+  placeholderRows?: ReadonlySet<T>,
 ): RowClassNameGetter<T> | undefined => {
-  if (!enableRowHighlight) return userGetRowClassName;
+  const hasPlaceholders = placeholderRows !== undefined && placeholderRows.size > 0;
+  if (!enableRowHighlight && !hasPlaceholders) return userGetRowClassName;
   return (row, rowIndex, ctx) =>
-    cx(getDiffRowClassName(diffs.get(row)), userGetRowClassName?.(row, rowIndex, ctx));
+    cx(
+      hasPlaceholders && placeholderRows.has(row) ? CMPG_CLASS_NAMES.rowPlaceholder : undefined,
+      enableRowHighlight ? getDiffRowClassName(diffs.get(row)) : undefined,
+      userGetRowClassName?.(row, rowIndex, ctx),
+    );
 };
 
 /** 差分ラベル列を挿入した列配列を返します。 */

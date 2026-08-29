@@ -79,6 +79,22 @@ type ComparisonLabels = {
 | `fieldDiffs` | `ReadonlySet<string>` | 差分のあった `CompareField.key`(`field-diff` 以外は空)。 |
 | `counterpart` | `T \| undefined` | 突き合わせ相手の行(片側のみの行では `undefined`)。 |
 
+### `alignComparisonRows<T>(annotatedLeft, annotatedRight, options?): AlignComparisonRowsResult<T>`
+
+`compare()` の注釈行を突き合わせ順に整列し、欠損側へ**プレースホルダ行**を挿入します(左右整列モードの純ロジック。`useComparison` の `alignRows: true` が内部で使うものと同じ)。
+
+| 引数 | 型 | 説明 |
+| --- | --- | --- |
+| `annotatedLeft` / `annotatedRight` | `readonly ComparisonRow<T>[]` | `compare()` の結果。 |
+| `options.createPlaceholderRow` | `(side: ComparisonSide) => T` | プレースホルダ行の生成。**呼び出しごとに新しいオブジェクト**を返すこと(同一性で判定するため)。既定は `{} as T`(`row[key]` が `undefined` になり空セルとして描画される。入れ子アクセスする `getValue` / `renderCell` がある場合は安全な行を返す実装を渡す)。 |
+
+戻り値:
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `pairs` | `{ left: T; right: T }[]` | 突き合わせ順の対。**左の行順**を基準に対を作り、左と対にならなかった右行(right-only / キー重複の残り)を**右の行順**で末尾に並べる。キー重複で複数行が同じ相手を指す場合、相手は先に対になった行が消費する。 |
+| `placeholders` | `ComparisonPlaceholders<T>` = `{ left: ReadonlySet<T>; right: ReadonlySet<T> }` | 各側の配列に挿入されたプレースホルダ行の集合。プレースホルダは差分 Map に載らないため、ハイライト / 差分ラベルは自動的に対象外。 |
+
 ## React 層
 
 ### `useComparison<T>(options): UseComparisonResult<T>`
@@ -89,19 +105,22 @@ type ComparisonLabels = {
 | --- | --- | --- | --- |
 | `left` / `right` | `readonly T[]` | (required) | 左右のデータ。 |
 | `showDiffOnly` | `boolean` | `false` | 「差分のみ表示」の意思(利用側の state)。 |
+| `alignRows` | `boolean` | `false` | 左右整列モード。`visibleLeft` / `visibleRight` が整列済み配列(常に同じ長さ・欠損側はプレースホルダ行)になる。「差分のみ」は**対の単位**でフィルタされ整列が保たれる。 |
+| `createPlaceholderRow` | `(side: ComparisonSide) => T` | `() => ({} as T)` | `alignRows` 時のプレースホルダ行生成(`alignComparisonRows` と同じ)。 |
 
 戻り値は `ComparisonResult<T>` に以下を加えたもの:
 
 | Name | Type | Description |
 | --- | --- | --- |
 | `compareFields` | `readonly CompareField<T>[]` | 参照安定化済みの `compareFields`(ペインのセル強調に使う)。 |
-| `visibleLeft` / `visibleRight` | `readonly T[]` | `effectiveShowDiffOnly` 適用後の表示行(`kind !== 'same'` を残す)。フィルタ無しのときは入力配列と**同一参照**(グリッドの `autoSizeColumns: 'onDataChange'` 等と相性がよい)。 |
+| `visibleLeft` / `visibleRight` | `readonly T[]` | `effectiveShowDiffOnly` 適用後の表示行(`kind !== 'same'` を残す)。フィルタ無し・`alignRows` OFF のときは入力配列と**同一参照**(グリッドの `autoSizeColumns: 'onDataChange'` 等と相性がよい)。`alignRows` ON では整列済み配列(プレースホルダ行を含む・常に同じ長さ)。 |
+| `placeholders` | `ComparisonPlaceholders<T>` | `alignRows` で各側の表示配列に挿入されたプレースホルダ行(OFF のときは空 Set)。`ComparisonView` へ `comparison` を渡せば自動で配線される。 |
 | `hasBothSides` | `boolean` | `left.length > 0 && right.length > 0`。 |
 | `effectiveShowDiffOnly` | `boolean` | `hasBothSides && showDiffOnly`。チェックボックスの `checked` に渡す。 |
 | `canShowDiffOnly` | `boolean` | `hasBothSides && hasAnyDiff`。トグルの `disabled={!canShowDiffOnly}` に渡す(片側のみ / 差分なしで無効化 = ss2602 の `isDiffSwitchDisabled` の否定)。 |
 | `getDiff` | `(row: T) => ComparisonRowDiff<T> \| undefined` | 左右どちらの行でも差分を引ける参照関数(自作列の `getValue` 等に)。 |
 
-**メモ化**: `left` / `right` / `getMatchKey` / `formatDiffLabel` / `duplicateKeyPolicy` は参照(同一性)で、`compareFields` / `labels` は**浅い構造比較**で依存を判定します。つまり `compareFields: [{ key: 'qty', label: '数量' }]` のようなインライン記述は毎レンダー書き直しても再計算されませんが、`getValue` / `equals` / `getMatchKey` をインライン関数で書くと毎レンダー再計算されます(コンポーネント外か `useCallback` で定義してください)。
+**メモ化**: `left` / `right` / `getMatchKey` / `formatDiffLabel` / `duplicateKeyPolicy` / `createPlaceholderRow` は参照(同一性)で、`compareFields` / `labels` は**浅い構造比較**で依存を判定します。つまり `compareFields: [{ key: 'qty', label: '数量' }]` のようなインライン記述は毎レンダー書き直しても再計算されませんが、`getValue` / `equals` / `getMatchKey` / `createPlaceholderRow` をインライン関数で書くと毎レンダー再計算されます(コンポーネント外か `useCallback` で定義してください。特に `createPlaceholderRow` はプレースホルダ行の同一性が毎レンダー変わり、グリッドが行の差し替えと誤認します)。
 
 ### `ComparisonView<T extends object>`
 
@@ -109,7 +128,7 @@ type ComparisonLabels = {
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `comparison` | `ComparisonViewModel<T>` | (required) | `useComparison` の戻り値をそのまま渡す(`visibleLeft` / `visibleRight` / `leftDiffs` / `rightDiffs` / `compareFields` を使用)。 |
+| `comparison` | `ComparisonViewModel<T>` | (required) | `useComparison` の戻り値をそのまま渡す(`visibleLeft` / `visibleRight` / `leftDiffs` / `rightDiffs` / `compareFields`、alignRows 利用時は `placeholders` も使用)。 |
 | `columns` | `readonly GridColumn<T>[]` | (required) | 利用側の列定義(両ペイン共通)。参照安定化(浅い構造比較)される。 |
 | `keyColumnKeys` | `readonly string[]` | — | 突き合わせキー相当の列キー。`left-only` / `right-only` 行でその列のセルを強調。 |
 | `leftHeader` / `rightHeader` | `ReactNode` | — | ペイン上部のスロット。片側だけ指定しても両ペインに(空の)スロットを描画して上端を揃える。 |
@@ -134,6 +153,7 @@ type ComparisonLabels = {
 | `columns` | `readonly GridColumn<T>[]` | (required) | 列定義。 |
 | `compareFields` | `readonly CompareField<T>[]` | — | セル強調の対応付け(`useComparison().compareFields`)。 |
 | `keyColumnKeys` | `readonly string[]` | — | 同上。 |
+| `placeholderRows` | `ReadonlySet<T>` | — | この側の `rows` に含まれるプレースホルダ行(`placeholders.left` 等)。`.cmpg-row-placeholder` を付与する。 |
 | `header` | `ReactNode` | — | ヘッダースロット。 |
 | `showHeader` | `boolean` | `header !== undefined` | スロットの描画有無(片側だけヘッダーがある場合の高さ揃えに)。 |
 | `gridProps` | `ComparisonGridProps<T>` | — | 透過 props。 |
@@ -171,6 +191,7 @@ type ComparisonLabels = {
 | `.cmpg-grid` | グリッド root(`.ssg-root`) | 利用側 `className` と合成。 |
 | `.cmpg-row-diff` | 行コンテナ + 各データセル | `same` 以外の行。修飾子 `--left-only` / `--right-only` / `--field`。 |
 | `.cmpg-cell-diff` | セル | 強調セル共通。修飾子 `--key`(キー列 × 片側のみ行)/ `--field`(差分フィールド列 × field-diff 行)。 |
+| `.cmpg-row-placeholder` | 行コンテナ + 各データセル | alignRows で欠損側に入るプレースホルダ行。差分ハイライトとは独立で、`enableRowHighlight={false}` でも付与される。 |
 
 ハイライトの実体は `.ssg-body-cell.cmpg-row-diff { background }` / `.ssg-body-cell.cmpg-cell-diff { color; font-weight }`(特異度 (0,2,0))。行ホバーは `.ssg-body-cell.cmpg-row-diff.ssg-body-cell--row-hovered` で `--cmpg-diff-row-hover-bg` に切り替わります。
 
@@ -186,6 +207,8 @@ type ComparisonLabels = {
 | `--cmpg-diff-row-hover-bg` | `:where(.cmpg-pane)` | `#fef08a` | `rgba(250, 204, 21, 0.22)` |
 | `--cmpg-diff-text` | `:where(.cmpg-pane)` | `#dc2626` | `#f87171` |
 | `--cmpg-diff-font-weight` | `:where(.cmpg-pane)` | `700` | — |
+| `--cmpg-placeholder-row-bg` | `:where(.cmpg-pane)` | `#f3f4f6` | `rgba(148, 163, 184, 0.1)` |
+| `--cmpg-placeholder-row-hover-bg` | `:where(.cmpg-pane)` | `#e5e7eb` | `rgba(148, 163, 184, 0.18)` |
 
 上書きは `.cmpg-pane { --cmpg-diff-row-bg: ... }`(light)/ `.cmpg-pane .ssg-theme-dark { ... }`(dark)。`:where()` 定義のため読み込み順に依らず勝ちます。
 
@@ -198,11 +221,12 @@ type ComparisonLabels = {
 
 - 差分は行**オブジェクトの同一性**で引きます。`useComparison` の `visibleLeft` / `visibleRight` をそのままペインへ渡し、途中で `map` 等で複製しないでください(複製した行は強調されません)。
 - `T` はオブジェクトである必要があります(`SpreadsheetGrid<T extends object>` の要求と同じ。`compare()` 単体は任意の `T` で動きます)。
-- 左右の行の**位置は揃えません**(ss2602 と同じ)。整列モード / スクロール同期は Phase 2 の候補です(`docs/DESIGN_NOTES.md`)。
+- 左右の行の位置は既定では揃えません(ss2602 と同じ)。揃えたい場合は `alignRows: true`(左右整列モード)。プレースホルダ行は差分 Map に載らないため `getDiff()` は `undefined` を返します(`placeholders` の Set で判定してください)。
+- `alignRows` のプレースホルダ行は既定で `{} as T` です。`row.foo.bar` のような入れ子アクセスをする `getValue` / `renderCell` / `valueFormatter` がある列では `createPlaceholderRow` で安全な行を返してください。
 - グリッドの行グルーピング(`rowGroup`)を有効にした場合、グループ行には差分クラスは付きません(leaf 行のみ)。
 
 ## Phase 2(未実装・設計だけ壊さない)
 
 - マニュアル入力ペイン(編集可能グリッド + 末尾空行維持 + 正規化フック + 送信時検証)。
 - `getComparisonExportData()`(spreadsheet-grid の `getExportData()` と同じ思想。現状は `annotatedLeft` / `annotatedRight` から利用側で整形可能)。
-- 差分ジャンプ(`scrollToRow` を使った次 / 前の差分行への移動)、左右整列モード + スクロール同期。
+- 差分ジャンプ(`scrollToRow` を使った次 / 前の差分行への移動)、スクロール同期(左右整列モードは実装済み)。

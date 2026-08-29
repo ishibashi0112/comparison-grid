@@ -159,6 +159,30 @@ describe('composeRowClassName', () => {
     expect(composeRowClassName(result.leftDiffs, user, false)).toBe(user);
     expect(composeRowClassName(result.leftDiffs, undefined, false)).toBeUndefined();
   });
+
+  it('placeholderRows の行には .cmpg-row-placeholder が付き、差分クラスは付かない', () => {
+    const placeholder = row('__ph', 0);
+    const placeholders: ReadonlySet<Row> = new Set([placeholder]);
+    const fn = composeRowClassName(result.leftDiffs, undefined, true, placeholders);
+    expect(fn?.(placeholder, 3, rowCtxOf(placeholder, 3))).toBe(CMPG_CLASS_NAMES.rowPlaceholder);
+    // 差分行はこれまでどおり。
+    expect(fn?.(left[1], 1, rowCtxOf(left[1], 1))).toBe('cmpg-row-diff cmpg-row-diff--field');
+  });
+
+  it('enableRowHighlight=false でもプレースホルダ行クラスは付与され、利用側と合成される', () => {
+    const placeholder = row('__ph', 0);
+    const placeholders: ReadonlySet<Row> = new Set([placeholder]);
+    const user = () => 'user-class';
+    const fn = composeRowClassName(result.leftDiffs, user, false, placeholders);
+    expect(fn).not.toBe(user);
+    expect(fn?.(placeholder, 0, rowCtxOf(placeholder, 0))).toBe(
+      `${CMPG_CLASS_NAMES.rowPlaceholder} user-class`,
+    );
+    // 差分行には差分クラスが付かない(ハイライト無効)。
+    expect(fn?.(left[1], 1, rowCtxOf(left[1], 1))).toBe('user-class');
+    // 空 Set なら従来どおり利用側の関数をそのまま返す。
+    expect(composeRowClassName(result.leftDiffs, user, false, new Set<Row>())).toBe(user);
+  });
 });
 
 describe('insertDiffLabelColumn', () => {

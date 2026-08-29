@@ -48,13 +48,14 @@ const right = [row('A', 1), row('B', 2), row('D', 1)];
 type HarnessProps = Partial<UseComparisonOptions<Row>> &
   Omit<ComparisonViewProps<Row>, 'comparison' | 'columns'>;
 
-function Harness({ showDiffOnly, ...viewProps }: HarnessProps) {
+function Harness({ showDiffOnly, alignRows, ...viewProps }: HarnessProps) {
   const comparison = useComparison<Row>({
     left,
     right,
     getMatchKey: (r) => r.id,
     compareFields,
     showDiffOnly,
+    alignRows,
   });
   return <ComparisonView<Row> comparison={comparison} columns={columns} {...viewProps} />;
 }
@@ -127,6 +128,35 @@ describe('ComparisonView', () => {
     );
     expect(container.querySelectorAll('.cmpg-row-diff')).toHaveLength(0);
     expect(container.querySelectorAll('.cmpg-cell-diff')).toHaveLength(0);
+  });
+
+  it('alignRows でプレースホルダ行が .cmpg-row-placeholder つきの空行として描画される', () => {
+    const { container } = render(<Harness alignRows showDiffLabelColumn />);
+    // 左: A / B / C + プレースホルダ(右のみ D の相手)。右: A / B + プレースホルダ(C の相手)+ D。
+    const leftPlaceholderCells = cellsIn(container, 'left', '.ssg-body-cell.cmpg-row-placeholder');
+    const rightPlaceholderCells = cellsIn(container, 'right', '.ssg-body-cell.cmpg-row-placeholder');
+    expect(leftPlaceholderCells.length).toBeGreaterThan(0);
+    expect(rightPlaceholderCells.length).toBeGreaterThan(0);
+    // プレースホルダのセルは空(差分ラベル列も含む)で、差分クラスは付かない。
+    expect(cellTexts(leftPlaceholderCells).every((t) => t === '')).toBe(true);
+    expect(leftPlaceholderCells.every((el) => !el.classList.contains('cmpg-row-diff'))).toBe(true);
+    // 両ペインの本体行数が一致する(左 3 + 1 / 右 3 + 1)。
+    expect(cellsIn(container, 'left', '.ssg-body-row')).toHaveLength(4);
+    expect(cellsIn(container, 'right', '.ssg-body-row')).toHaveLength(4);
+  });
+
+  it('alignRows + showDiffOnly は same の対だけが両ペインから消える', () => {
+    const { container } = render(<Harness alignRows showDiffOnly keyColumnKeys={['id']} />);
+    expect(cellsIn(container, 'left', '.ssg-body-row')).toHaveLength(3);
+    expect(cellsIn(container, 'right', '.ssg-body-row')).toHaveLength(3);
+    const leftIds = cellTexts(cellsIn(container, 'left', '.ssg-body-cell')).filter((t) =>
+      ['A', 'B', 'C', 'D'].includes(t ?? ''),
+    );
+    expect(leftIds).toEqual(['B', 'C']);
+    const rightIds = cellTexts(cellsIn(container, 'right', '.ssg-body-cell')).filter((t) =>
+      ['A', 'B', 'C', 'D'].includes(t ?? ''),
+    );
+    expect(rightIds).toEqual(['B', 'D']);
   });
 
   it('利用側の getRowClassName / className と共存する', () => {
