@@ -16,7 +16,7 @@ Side-by-side **two-list comparison** for **React 19**, built on top of [`@ishiba
 - **Four diff kinds** — `same` / `left-only` / `right-only` / `field-diff`, with a generated label (`"左のみ"`, `"数量・支給区分違い"`, …) that you can reword or replace.
 - **`useComparison()`** — derives `visibleLeft` / `visibleRight` (diff-only filter), `effectiveShowDiffOnly` (never `true` when one side is empty), `canShowDiffOnly` (for disabling the toggle), per-side counts and duplicate-key reports.
 - **Aligned mode (`alignRows`)** — both panes get the same length in match order, with placeholder rows (styled `.cmpg-row-placeholder`) inserted on the missing side; the diff-only filter works per pair so alignment is preserved.
-- **Hierarchical comparison (`useTreeComparison()`)** — for BOM-like trees. Build a tree from flat rows (`buildComparisonTree`: depth-first + level, or adjacency list), and the library derives **path keys** (`B2002/C3001`) so the same part under a different parent never pairs; representative-code substitution propagates to descendants; sibling duplicates get an occurrence suffix; broken input is reported as `issues`, never repaired. Aligned mode becomes a structural merge (right-only subtrees land next to their siblings) and the diff-only filter keeps ancestors as dimmed context rows.
+- **Hierarchical comparison (`useTreeComparison()`)** — for BOM-like trees. Build a tree from flat rows (`buildComparisonTree`: depth-first + level, or adjacency list), and the library derives **path keys** (`B2002/C3001`) so the same part under a different parent never pairs; representative-code substitution propagates to descendants; sibling duplicates get an occurrence suffix; broken input is reported as `issues`, never repaired. Aligned mode becomes a structural merge (right-only subtrees land next to their siblings) and the diff-only filter keeps ancestors as dimmed context rows. Unchanged parents with changes below get a `.cmpg-row-rollup` tint and a `配下に差分 n 件` label in the diff-label column (`getDescendantDiffCount(row)` for your own columns).
 - **Scroll sync (`enableScrollSync`)** — keeps both panes' vertical scroll in lockstep (user scrolls propagate, API-driven ones are ignored to prevent loops). Pairs naturally with `alignRows`.
 - **Export (`getComparisonExportData()`)** — one side's rows + diff label column in the same `{ columns, rows: { value, text }[][] }` shape as the grid's `getExportData()`, so downstream CSV/Excel code can be shared.
 - **Diff navigation (`useComparisonNavigation()`)** — next/previous-diff jumping that scrolls both panes to the matching pair (wraps around; understands `alignRows` placeholders).
@@ -209,7 +209,8 @@ const comparison = useTreeComparison<BomRow>({
   alignRows,
 });
 comparison.getTreeInfo(row); // { depth, parent, hasChildren, occurrence, matchKey }
-<ComparisonView comparison={comparison} columns={columns} />
+comparison.getDescendantDiffCount(row); // changed rows below (> 0 on an unchanged parent)
+<ComparisonView comparison={comparison} columns={columns} showDiffLabelColumn />
 ```
 
 Headless: `flattenComparisonTree(roots, { getCode })` gives depth-first `rows` plus an `infos` map with each row's `matchKey`; feed them to `compare()` and `alignComparisonTree()`.
@@ -281,7 +282,7 @@ MIT
 - **4 種類の差分** — `same` / `left-only` / `right-only` / `field-diff` と、生成ラベル(`"左のみ"`、`"数量・支給区分違い"` など)。文言の差し替え / 完全カスタムが可能。
 - **`useComparison()`** — `visibleLeft` / `visibleRight`(差分のみフィルタ)、`effectiveShowDiffOnly`(片側が空なら常に `false`)、`canShowDiffOnly`(トグルの無効化条件)、片側ごとの件数、キー重複の報告を導出します。
 - **左右整列モード(`alignRows`)** — 両ペインを突き合わせ順の同じ長さに揃え、欠損側へプレースホルダ行(`.cmpg-row-placeholder`)を挿入。「差分のみ」は対の単位でフィルタされ、整列が保たれます。
-- **階層比較(`useTreeComparison()`)** — 部品表のような木構造向け。平坦な行から木を組み立て(`buildComparisonTree`: 深さ優先順 + level、または隣接リスト)、ライブラリが**パスキー**(`B2002/C3001`)を導出するので、別の親の下の同じ品番が突き合うことがありません。代表品番の置き換えは子孫へ伝播、兄弟の重複には出現番号、入力の破綻は修復せず `issues` で報告。整列モードは構造マージ(右のみサブツリーが兄弟の位置に入る)になり、「差分のみ」では祖先が薄い文脈行として残ります。
+- **階層比較(`useTreeComparison()`)** — 部品表のような木構造向け。平坦な行から木を組み立て(`buildComparisonTree`: 深さ優先順 + level、または隣接リスト)、ライブラリが**パスキー**(`B2002/C3001`)を導出するので、別の親の下の同じ品番が突き合うことがありません。代表品番の置き換えは子孫へ伝播、兄弟の重複には出現番号、入力の破綻は修復せず `issues` で報告。整列モードは構造マージ(右のみサブツリーが兄弟の位置に入る)になり、「差分のみ」では祖先が薄い文脈行として残ります。自身は同一でも配下に差分がある親には `.cmpg-row-rollup` の淡い色と、差分ラベル列に `配下に差分 n 件` が出ます(自作列には `getDescendantDiffCount(row)`)。
 - **スクロール同期(`enableScrollSync`)** — 左右ペインの縦スクロールを同期(ユーザー操作のみ伝播し、API 由来は無視してループを防止)。`alignRows` との併用を想定。
 - **エクスポート(`getComparisonExportData()`)** — 片側の行 + 差分ラベル列を、本体の `getExportData()` と同形(`{ columns, rows: { value, text }[][] }`)で返します。CSV / Excel 出力の下流処理を共用できます。
 - **差分ジャンプ(`useComparisonNavigation()`)** — 次 / 前の差分へ両ペインを対でスクロール(末尾からは先頭へラップ。`alignRows` のプレースホルダ位置も理解します)。
@@ -474,7 +475,8 @@ const comparison = useTreeComparison<BomRow>({
   alignRows,
 });
 comparison.getTreeInfo(row); // { depth, parent, hasChildren, occurrence, matchKey }
-<ComparisonView comparison={comparison} columns={columns} />
+comparison.getDescendantDiffCount(row); // 配下の差分行数(同一の親でも配下に差分があれば > 0)
+<ComparisonView comparison={comparison} columns={columns} showDiffLabelColumn />
 ```
 
 headless で使う場合は `flattenComparisonTree(roots, { getCode })` が深さ優先順の `rows` と、行ごとの `matchKey` を持つ `infos` を返すので、`compare()` と `alignComparisonTree()` に渡します。

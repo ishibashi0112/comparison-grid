@@ -5,11 +5,14 @@
 //   - 「差分のみ」は差分行に加えて**その祖先(文脈行)**を残します。C3001 の差分が「どの ASSY の」か
 //     分かるようにするためで、文脈行は contextRows で返し ComparisonView が .cmpg-row-context を付与します。
 //     alignRows では対の単位でフィルタし整列を維持します。
+//   - ロールアップ(行 → 配下の差分行数)を descendantDiffCounts で返します。文脈行の判定もこれを使います
+//     (文脈行 = 自身は same で配下に差分がある行)。ComparisonView は .cmpg-row-rollup と配下差分ラベルに使います。
 //   - getTreeInfo(row) で深さ / 親 / 子の有無 / 出現番号 / キーを引けます(サイドカー。T には書きません)。
 //   - visibleLeft / visibleRight は平坦化した配列で、入力(木)と同一参照にはなりません(木が同じ参照なら安定)。
 import { useCallback, useMemo } from 'react';
 import type {
   ComparisonContextRows,
+  ComparisonDescendantDiffCounts,
   ComparisonPlaceholders,
   ComparisonRow,
   ComparisonRowDiff,
@@ -20,6 +23,7 @@ import type {
 import { compare } from '../logic/compare';
 import { flattenComparisonTree } from '../logic/tree';
 import { alignComparisonTree } from '../logic/alignTree';
+import { countDescendantDiffs } from '../logic/rollup';
 import { useStableArray, useStableObject } from './useStableValue';
 
 const EMPTY_SET: ReadonlySet<never> = new Set();
@@ -33,25 +37,21 @@ type KeptRows<T> = {
   context: ReadonlySet<T>;
 };
 
-/** 差分行と、その祖先(文脈行)を集める。祖先が自身も差分行ならその行の反復で辿るため二重に歩かない。 */
+/** 「差分のみ」で残す行を集める: 差分行 + 文脈行(自身は same だが配下に差分がある行 = ロールアップ > 0)。 */
 const collectKeptRows = <T>(
   annotated: readonly ComparisonRow<T>[],
-  infos: ReadonlyMap<T, ComparisonTreeInfo<T>>,
+  descendantDiffCounts: ReadonlyMap<T, number>,
 ): KeptRows<T> => {
-  const diffRows = new Set<T>();
-  for (const entry of annotated) {
-    if (entry.diff.kind !== 'same') diffRows.add(entry.row);
-  }
+  const rows = new Set<T>();
   const context = new Set<T>();
-  for (const row of diffRows) {
-    let parent = infos.get(row)?.parent;
-    while (parent !== undefined && !diffRows.has(parent) && !context.has(parent)) {
-      context.add(parent);
-      parent = infos.get(parent)?.parent;
+  for (const { row, diff } of annotated) {
+    if (diff.kind !== 'same') {
+      rows.add(row);
+    } else if (descendantDiffCounts.has(row)) {
+      rows.add(row);
+      context.add(row);
     }
   }
-  const rows = new Set<T>(diffRows);
-  for (const row of context) rows.add(row);
   return { rows, context };
 };
 
@@ -111,15 +111,23 @@ export function useTreeComparison<T>(
     [alignRows, left, right, result, createPlaceholderRow],
   );
 
+  const descendantDiffCounts = useMemo<ComparisonDescendantDiffCounts<T>>(
+    () => ({
+      left: countDescendantDiffs(result.annotatedLeft, flatLeft.infos),
+      right: countDescendantDiffs(result.annotatedRight, flatRight.infos),
+    }),
+    [result, flatLeft, flatRight],
+  );
+
   const kept = useMemo(
     () =>
       effectiveShowDiffOnly
         ? {
-            left: collectKeptRows(result.annotatedLeft, flatLeft.infos),
-            right: collectKeptRows(result.annotatedRight, flatRight.infos),
+            left: collectKeptRows(result.annotatedLeft, descendantDiffCounts.left),
+            right: collectKeptRows(result.annotatedRight, descendantDiffCounts.right),
           }
         : undefined,
-    [effectiveShowDiffOnly, result, flatLeft, flatRight],
+    [effectiveShowDiffOnly, result, descendantDiffCounts],
   );
 
   // alignRows では対の単位でフィルタし、左右の行位置対応を保つ(どちらかの側が残す行なら対ごと残す)。
@@ -158,6 +166,11 @@ export function useTreeComparison<T>(
       flatLeft.infos.get(row) ?? flatRight.infos.get(row),
     [flatLeft, flatRight],
   );
+  const getDescendantDiffCount = useCallback(
+    (row: T): number =>
+      descendantDiffCounts.left.get(row) ?? descendantDiffCounts.right.get(row) ?? 0,
+    [descendantDiffCounts],
+  );
 
   return useMemo(
     () => ({
@@ -172,6 +185,8 @@ export function useTreeComparison<T>(
       canShowDiffOnly,
       getDiff,
       getTreeInfo,
+      descendantDiffCounts,
+      getDescendantDiffCount,
     }),
     [
       result,
@@ -185,6 +200,8 @@ export function useTreeComparison<T>(
       canShowDiffOnly,
       getDiff,
       getTreeInfo,
+      descendantDiffCounts,
+      getDescendantDiffCount,
     ],
   );
 }

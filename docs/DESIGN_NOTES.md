@@ -94,6 +94,13 @@
 - **デモの木化**: `BomRow` から `itemPath` を廃止(行型は API の素の形へ)。`buildComparisonTree(rows, { getLevel })` + `useTreeComparison`。A1000-R2 の「モーターASSY」を ASSY ごと後継品番(`B2002A`、代表 `B2002`、子は同じ)にし、通常比較ではサブツリー丸ごと左のみ + 右のみ、代表品番比較 ON で子同士が突き合う(伝播)ことを目視できるようにした。`issues` 件数をサマリ行に表示。大量データ生成器の「後継品番は葉に限定」はデータ安定のため据え置き(キー規則上の制約ではなくなった)。
 - 残候補(batch 16 以降): 親への差分ロールアップ表示 / サブツリーの折りたたみ。
 
+### 実装済み(2026-08-30・batch 16a。ロールアップ = 親への差分表示)
+
+- **`countDescendantDiffs`(純ロジック)**: 行 → 配下の差分行数(自身は数えない)。`useTreeComparison` の「差分のみ」の文脈行判定(自身は same で配下に差分がある行)をこれに置き換え、祖先の保持とロールアップが同じ計算になった(15b で「内在するが公開していない」としていたもの)。
+- **表示**: 自身が same で配下に差分がある行に `.cmpg-row-rollup`(差分行より薄い黄 yellow-50。CVD は blue-50)。差分行クラスとは同時に付かない(自身が差分なら差分クラスが優先)。ロールアップは差分ハイライトの一種として `enableRowHighlight` に従う(プレースホルダ / 文脈行は構造的なので従わない、という線引きを維持)。
+- **差分ラベル列**: 自身のラベルが空で配下に差分がある行に `descendantDiffLabel(count)`(既定 `配下に差分 n 件`)。`DiffLabelColumnOptions.descendantDiffLabel` で差し替え。`getComparisonExportData` にも `descendantDiffCounts` を渡せば同じ規則でエクスポートされる。
+- 配線は `ComparisonView` → `ComparisonPane`(`descendantDiffCounts` prop)→ `composeRowClassName` / `insertDiffLabelColumn`。`ComparisonPane` を直接使う場合は `descendantDiffCounts={comparison.descendantDiffCounts.left}` を渡す。
+
 ## 6. 環境メモ
 
 - spreadsheet-grid: `~/dev/datasheet-grid`(GitHub `ishibashi0112/datasheet-grid`)。v0.29.0 = npm latest(2026-08-29・提案対応リリース「proposals batch 1〜6」)。ss2602 は `^0.16.0` 固定なので、ライブラリ導入時に 0.29 系へ上げる必要がある(0.17〜0.28 で export scope の改名や既定値変更あり)。

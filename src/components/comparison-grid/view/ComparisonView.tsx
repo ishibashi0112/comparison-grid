@@ -158,6 +158,7 @@ export function ComparisonView<T extends object>(props: ComparisonViewProps<T>) 
         keyColumnKeys={keyColumnKeys}
         placeholderRows={comparison.placeholders?.left}
         contextRows={comparison.contextRows?.left}
+        descendantDiffCounts={comparison.descendantDiffCounts?.left}
         header={leftHeader}
         showHeader={showHeader}
         gridProps={leftProps}
@@ -172,6 +173,7 @@ export function ComparisonView<T extends object>(props: ComparisonViewProps<T>) 
         keyColumnKeys={keyColumnKeys}
         placeholderRows={comparison.placeholders?.right}
         contextRows={comparison.contextRows?.right}
+        descendantDiffCounts={comparison.descendantDiffCounts?.right}
         header={rightHeader}
         showHeader={showHeader}
         gridProps={rightProps}

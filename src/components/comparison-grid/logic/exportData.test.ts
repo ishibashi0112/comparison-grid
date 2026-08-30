@@ -83,3 +83,16 @@ describe('getComparisonExportData', () => {
     expect(data.rows[2].every((cell) => cell.value === undefined || cell.value === '')).toBe(true);
   });
 });
+
+describe('getComparisonExportData: 木モードのロールアップ', () => {
+  it('descendantDiffCounts を渡すと、ラベルが空で配下に差分がある行に配下差分ラベルが入る', () => {
+    const counts: ReadonlyMap<Row, number> = new Map([[left[0], 3]]);
+    const data = getComparisonExportData<Row>({
+      rows: left,
+      diffs: result.leftDiffs,
+      columns: [{ key: 'id', title: 'ID', width: 80 }],
+      descendantDiffCounts: counts,
+    });
+    expect(data.rows.map((cells) => cells[1].text)).toEqual(['配下に差分 3 件', '数量違い', '左のみ']);
+  });
+});

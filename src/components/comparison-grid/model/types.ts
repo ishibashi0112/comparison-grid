@@ -207,6 +207,9 @@ export type DiffLabelColumnOptions<T> = Partial<
 > & {
   /** 挿入位置。既定 'end'。 */
   position?: 'start' | 'end' | number;
+  /** 木モードで、自身は same だが配下に差分がある行のラベル(既定 `配下に差分 ${count} 件`)。
+   *  descendantDiffCounts が渡されたときだけ使われる。 */
+  descendantDiffLabel?: (count: number) => string;
 };
 
 export type ComparisonDiffLabelColumnProps<T> = {
@@ -313,8 +316,10 @@ export type ComparisonExportOptions<T> = {
   columns: readonly GridColumn<T>[];
   /** 差分ラベル列を含める(既定 **true**。ペインの既定 false とは異なることに注意)。 */
   showDiffLabelColumn?: boolean;
-  /** ラベル列の調整(`key` / `title` / `position` を使用)。 */
+  /** ラベル列の調整(`key` / `title` / `position` / `descendantDiffLabel` を使用)。 */
   diffLabelColumn?: DiffLabelColumnOptions<T>;
+  /** 木モードのロールアップ(`useTreeComparison().descendantDiffCounts.left` 等)。ラベル列の配下差分ラベルに使う。 */
+  descendantDiffCounts?: ReadonlyMap<T, number>;
 };
 
 export type ComparisonPaneProps<T extends object> = ComparisonHighlightOptions &
@@ -331,6 +336,9 @@ export type ComparisonPaneProps<T extends object> = ComparisonHighlightOptions &
     placeholderRows?: ReadonlySet<T>;
     /** この側の rows に含まれる文脈行(木モードの「差分のみ」で残した差分行の祖先。.cmpg-row-context を付与)。 */
     contextRows?: ReadonlySet<T>;
+    /** この側のロールアップ(行 → 配下の差分行数)。自身が same で配下に差分がある行へ .cmpg-row-rollup を付与し、
+     *  差分ラベル列に配下差分ラベルを出す。 */
+    descendantDiffCounts?: ReadonlyMap<T, number>;
     header?: ReactNode;
     /** ヘッダースロットの描画。既定は header !== undefined。 */
     showHeader?: boolean;
@@ -346,7 +354,7 @@ export type ComparisonViewModel<T> = Pick<
   'visibleLeft' | 'visibleRight' | 'leftDiffs' | 'rightDiffs' | 'compareFields'
 > &
   Partial<Pick<UseComparisonResult<T>, 'placeholders'>> &
-  Partial<Pick<UseTreeComparisonResult<T>, 'contextRows'>>;
+  Partial<Pick<UseTreeComparisonResult<T>, 'contextRows' | 'descendantDiffCounts'>>;
 
 export type ComparisonViewProps<T extends object> = ComparisonHighlightOptions &
   ComparisonDiffLabelColumnProps<T> & {
@@ -454,6 +462,12 @@ export type ComparisonContextRows<T> = {
   right: ReadonlySet<T>;
 };
 
+/** 木モードのロールアップ: 行 → 配下(子孫)の差分行数(自身は数えない)。配下に差分が無い行は Map に載らない。 */
+export type ComparisonDescendantDiffCounts<T> = {
+  left: ReadonlyMap<T, number>;
+  right: ReadonlyMap<T, number>;
+};
+
 /** useTreeComparison のオプション。useComparison の left / right / getMatchKey を木とキー導出設定に置き換えたもの。 */
 export type UseTreeComparisonOptions<T> = Omit<UseComparisonOptions<T>, 'left' | 'right' | 'getMatchKey'> &
   ComparisonTreeKeyOptions<T> & {
@@ -466,4 +480,9 @@ export type UseTreeComparisonResult<T> = UseComparisonResult<T> & {
   contextRows: ComparisonContextRows<T>;
   /** 左右どちらの行でも階層情報(depth / parent / hasChildren / occurrence / matchKey)を引ける参照関数。 */
   getTreeInfo: (row: T) => ComparisonTreeInfo<T> | undefined;
+  /** ロールアップ(行 → 配下の差分行数)。ComparisonView へ comparison を渡せば .cmpg-row-rollup と
+   *  差分ラベル列の配下差分ラベルが自動で配線される。 */
+  descendantDiffCounts: ComparisonDescendantDiffCounts<T>;
+  /** 左右どちらの行でも配下の差分行数を引ける参照関数(無ければ 0)。 */
+  getDescendantDiffCount: (row: T) => number;
 };

@@ -29,6 +29,9 @@
   --cmpg-placeholder-row-hover-bg: #e5e7eb;
   /* 文脈行(木モードの「差分のみ」で差分行の祖先として残る same 行)。文字を薄く(Tailwind gray-500)。 */
   --cmpg-context-row-text: #6b7280;
+  /* ロールアップ行(自身は same だが配下に差分がある行)。差分行より薄い黄(Tailwind yellow-50 / yellow-100)。 */
+  --cmpg-rollup-row-bg: #fefce8;
+  --cmpg-rollup-row-hover-bg: #fef9c3;
 }
 
 :where(.cmpg-pane .ssg-theme-dark) {
@@ -38,6 +41,8 @@
   --cmpg-placeholder-row-bg: rgba(148, 163, 184, 0.1);
   --cmpg-placeholder-row-hover-bg: rgba(148, 163, 184, 0.18);
   --cmpg-context-row-text: #9ca3af;
+  --cmpg-rollup-row-bg: rgba(250, 204, 21, 0.07);
+  --cmpg-rollup-row-hover-bg: rgba(250, 204, 21, 0.12);
 }
 
 /* レイアウト */
@@ -71,6 +76,15 @@
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+}
+
+/* ロールアップ行(木モード。自身は same で配下に差分あり)。差分行クラスとは同時に付かない。 */
+.ssg-body-cell.cmpg-row-rollup {
+  background-color: var(--cmpg-rollup-row-bg);
+}
+
+.ssg-body-cell.cmpg-row-rollup.ssg-body-cell--row-hovered {
+  background-color: var(--cmpg-rollup-row-hover-bg);
 }
 
 /* 差分ハイライト(getRowClassName の返り値は行コンテナと各データセルに付与されます) */
@@ -110,6 +124,8 @@
   --cmpg-diff-row-bg: #dbeafe;
   --cmpg-diff-row-hover-bg: #bfdbfe;
   --cmpg-diff-text: #9a3412;
+  --cmpg-rollup-row-bg: #eff6ff;
+  --cmpg-rollup-row-hover-bg: #dbeafe;
 }
 
 :where(.cmpg-colors-cvd) :where(.cmpg-pane .ssg-theme-dark),
@@ -117,6 +133,8 @@
   --cmpg-diff-row-bg: rgba(59, 130, 246, 0.16);
   --cmpg-diff-row-hover-bg: rgba(59, 130, 246, 0.26);
   --cmpg-diff-text: #fdba74;
+  --cmpg-rollup-row-bg: rgba(59, 130, 246, 0.08);
+  --cmpg-rollup-row-hover-bg: rgba(59, 130, 246, 0.14);
 }
 
 :where(.cmpg-colors-cvd) .ssg-body-cell.cmpg-cell-diff {

@@ -28,7 +28,7 @@ export function ComparisonPane<T extends object>(props: ComparisonPaneProps<T>) 
     enableFieldCellHighlight = true,
     showDiffLabelColumn = false,
   } = props;
-  const { placeholderRows, contextRows } = props;
+  const { placeholderRows, contextRows, descendantDiffCounts } = props;
   const columns = useStableArray(props.columns);
   const compareFields = useStableArray(props.compareFields);
   const keyColumnKeys = useStableArray(props.keyColumnKeys);
@@ -41,7 +41,9 @@ export function ComparisonPane<T extends object>(props: ComparisonPaneProps<T>) 
       enableKeyCellHighlight,
       enableFieldCellHighlight,
     });
-    return showDiffLabelColumn ? insertDiffLabelColumn(composed, diffs, diffLabelColumn) : composed;
+    return showDiffLabelColumn
+      ? insertDiffLabelColumn(composed, diffs, diffLabelColumn, descendantDiffCounts)
+      : composed;
   }, [
     columns,
     diffs,
@@ -51,6 +53,7 @@ export function ComparisonPane<T extends object>(props: ComparisonPaneProps<T>) 
     enableFieldCellHighlight,
     showDiffLabelColumn,
     diffLabelColumn,
+    descendantDiffCounts,
   ]);
 
   const userGetRowClassName = gridProps?.getRowClassName;
@@ -62,8 +65,9 @@ export function ComparisonPane<T extends object>(props: ComparisonPaneProps<T>) 
         enableRowHighlight,
         placeholderRows,
         contextRows,
+        descendantDiffCounts,
       ),
-    [diffs, userGetRowClassName, enableRowHighlight, placeholderRows, contextRows],
+    [diffs, userGetRowClassName, enableRowHighlight, placeholderRows, contextRows, descendantDiffCounts],
   );
 
   return (

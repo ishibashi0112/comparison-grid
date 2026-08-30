@@ -16,8 +16,13 @@ export {
   TREE_KEY_OCCURRENCE_SEPARATOR,
 } from './logic/tree';
 export { alignComparisonTree } from './logic/alignTree';
+export { countDescendantDiffs } from './logic/rollup';
 // ライブラリが付与するクラス名と差分ラベル列の既定キー(利用側 CSS / テスト向け)。
-export { CMPG_CLASS_NAMES, DEFAULT_DIFF_LABEL_COLUMN_KEY } from './logic/paneColumns';
+export {
+  CMPG_CLASS_NAMES,
+  DEFAULT_DIFF_LABEL_COLUMN_KEY,
+  formatDefaultDescendantDiffLabel,
+} from './logic/paneColumns';
 // React 層。
 export { useComparison } from './hooks/useComparison';
 export { useTreeComparison } from './hooks/useTreeComparison';
@@ -57,6 +62,7 @@ export type {
   ComparisonTreeInfo,
   FlattenComparisonTreeResult,
   ComparisonContextRows,
+  ComparisonDescendantDiffCounts,
   UseTreeComparisonOptions,
   UseTreeComparisonResult,
   UseComparisonOptions,

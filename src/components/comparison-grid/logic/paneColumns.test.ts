@@ -185,6 +185,63 @@ describe('composeRowClassName', () => {
   });
 });
 
+describe('composeRowClassName: ロールアップ', () => {
+  // A(same)の配下に差分 2 件、B(field-diff)の配下にも 1 件ある想定。
+  const counts: ReadonlyMap<Row, number> = new Map([
+    [left[0], 2],
+    [left[1], 1],
+  ]);
+
+  it('自身が same で配下に差分がある行にだけ .cmpg-row-rollup が付く(差分行には付かない)', () => {
+    const fn = composeRowClassName(result.leftDiffs, undefined, true, undefined, undefined, counts);
+    expect(fn?.(left[0], 0, rowCtxOf(left[0], 0))).toBe(CMPG_CLASS_NAMES.rowRollup);
+    expect(fn?.(left[1], 1, rowCtxOf(left[1], 1))).toBe('cmpg-row-diff cmpg-row-diff--field');
+    expect(fn?.(left[2], 2, rowCtxOf(left[2], 2))).toBe('cmpg-row-diff cmpg-row-diff--left-only');
+  });
+
+  it('enableRowHighlight=false ならロールアップも付かない', () => {
+    expect(composeRowClassName(result.leftDiffs, undefined, false, undefined, undefined, counts)).toBeUndefined();
+  });
+
+  it('利用側のクラスと合成される', () => {
+    const user = () => 'user-class';
+    const fn = composeRowClassName(result.leftDiffs, user, true, undefined, undefined, counts);
+    expect(fn?.(left[0], 0, rowCtxOf(left[0], 0))).toBe(`${CMPG_CLASS_NAMES.rowRollup} user-class`);
+  });
+});
+
+describe('insertDiffLabelColumn: 配下差分ラベル', () => {
+  const counts: ReadonlyMap<Row, number> = new Map([
+    [left[0], 2],
+    [left[1], 1],
+  ]);
+
+  it('自身のラベルが空で配下に差分がある行に既定ラベルを出す(差分行は自身のラベル)', () => {
+    const composed = insertDiffLabelColumn(columns, result.leftDiffs, undefined, counts);
+    const labelColumn = composed[composed.length - 1];
+    expect(labelColumn.getValue?.(left[0])).toBe('配下に差分 2 件');
+    expect(labelColumn.getValue?.(left[1])).toBe('数量違い');
+    expect(labelColumn.getValue?.(left[2])).toBe('左のみ');
+  });
+
+  it('descendantDiffLabel で文言を差し替えられ、列オブジェクトには漏れない', () => {
+    const composed = insertDiffLabelColumn(
+      columns,
+      result.leftDiffs,
+      { descendantDiffLabel: (count) => `${count} changed below` },
+      counts,
+    );
+    const labelColumn = composed[composed.length - 1];
+    expect(labelColumn.getValue?.(left[0])).toBe('2 changed below');
+    expect('descendantDiffLabel' in labelColumn).toBe(false);
+  });
+
+  it('counts が無ければ従来どおり空', () => {
+    const composed = insertDiffLabelColumn(columns, result.leftDiffs, undefined);
+    expect(composed[composed.length - 1].getValue?.(left[0])).toBe('');
+  });
+});
+
 describe('insertDiffLabelColumn', () => {
   it('既定は末尾に追加され、getValue が差分ラベルを返す', () => {
     const composed = insertDiffLabelColumn(columns, result.leftDiffs, undefined);

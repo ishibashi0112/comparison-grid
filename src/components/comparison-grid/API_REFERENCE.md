@@ -4,7 +4,7 @@
 > `view/*.tsx`)から手で起こした公開 API のスナップショットです。**型を変更したら本ファイルも同期してください。**
 > spreadsheet-grid 側の props / 型は [spreadsheet-grid の API_REFERENCE](https://github.com/ishibashi0112/datasheet-grid/blob/main/src/components/spreadsheet-grid/API_REFERENCE.md) を参照。
 
-最終更新: 2026-08-30(batch 15a / 15b: 階層比較 — 純ロジック + `useTreeComparison` + 文脈行)。
+最終更新: 2026-08-30(batch 15a / 15b / 16a: 階層比較 — 純ロジック + `useTreeComparison` + 文脈行 + ロールアップ)。
 
 ## 設計の要点
 
@@ -105,7 +105,8 @@ type ComparisonLabels = {
 | `diffs` | `ComparisonDiffMap<T>` | (required) | この側の差分 Map(`leftDiffs` / `rightDiffs`)。 |
 | `columns` | `readonly GridColumn<T>[]` | (required) | 列定義。`visible: false` の列は除外。 |
 | `showDiffLabelColumn` | `boolean` | **`true`** | 差分ラベル列を含める(ペインの既定 `false` と異なる)。 |
-| `diffLabelColumn` | `DiffLabelColumnOptions<T>` | — | ラベル列の調整(`key` / `title` / `position` を使用)。 |
+| `diffLabelColumn` | `DiffLabelColumnOptions<T>` | — | ラベル列の調整(`key` / `title` / `position` / `descendantDiffLabel` を使用)。 |
+| `descendantDiffCounts` | `ReadonlyMap<T, number>` | — | 木モードのロールアップ。渡すとラベル列に配下差分ラベルが入る(ペインと同じ規則)。 |
 
 セルの規則: `value` は `getValue ?? row[key]`、`text` は本体の**セル表示**と同じく `value == null` なら `''`(`valueFormatter` を通さない)、それ以外は `valueFormatter({ value, row, column }) ?? String(value)`。列見出しは `title ?? key`。プレースホルダ行(alignRows)は全セル空になります。
 
@@ -181,6 +182,10 @@ const result = compare(flatLeft.rows, flatRight.rows, {
 
 規則: 兄弟リスト単位で左の順に対を作り(相手は**同じ兄弟リストに居る** counterpart だけ。別の場所に居る相手は片側のみ扱い)、右にしか無いサブツリーは**直前に対になった兄弟の直後**に挿入します(先行する対が無ければ最初の対の直前、対が 1 つも無ければ末尾)。片側のみのサブツリーは丸ごと相手側プレースホルダと組みます。ASSY 内に追加された部品がその ASSY の直下に並び、左右の親子関係が崩れません。
 
+### `countDescendantDiffs<T>(annotated, infos): Map<T, number>`
+
+ロールアップの純ロジック。`compare()` の注釈行(`annotatedLeft` 等)と `flattenComparisonTree` の `infos` から、行ごとに**配下(子孫)の差分行数**(`kind !== 'same'` の行数。自身は数えない)を返します。配下に差分が無い行は Map に載りません。`useTreeComparison` はこれを `descendantDiffCounts` として返し、「差分のみ」の文脈行判定(自身は same で配下に差分がある行)にも使います。
+
 ## React 層
 
 ### `useComparison<T>(options): UseComparisonResult<T>`
@@ -232,6 +237,8 @@ const result = compare(flatLeft.rows, flatRight.rows, {
 | --- | --- | --- |
 | `contextRows` | `{ left: ReadonlySet<T>; right: ReadonlySet<T> }` | 「差分のみ」で残した文脈行(OFF のときは空 Set)。`ComparisonView` へ `comparison` を渡せば自動で配線される。 |
 | `getTreeInfo` | `(row: T) => ComparisonTreeInfo<T> \| undefined` | 左右どちらの行でも階層情報(`depth` / `parent` / `hasChildren` / `occurrence` / `matchKey`)を引ける(Level 列のインデント等に。プレースホルダ行は `undefined`)。 |
+| `descendantDiffCounts` | `{ left: ReadonlyMap<T, number>; right: ReadonlyMap<T, number> }` | ロールアップ(行 → 配下の差分行数)。`ComparisonView` へ `comparison` を渡せば、自身は same で配下に差分がある行へ `.cmpg-row-rollup` が付き、差分ラベル列に配下差分ラベル(既定 `配下に差分 n 件`)が出る。 |
+| `getDescendantDiffCount` | `(row: T) => number` | 左右どちらの行でも配下の差分行数を引ける(無ければ `0`。自作列の「配下に差分あり」マーク等に)。 |
 
 ```tsx
 const leftTree = useMemo(() => buildComparisonTree(leftRows, { getLevel }), [leftRows]);
@@ -304,14 +311,14 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `comparison` | `ComparisonViewModel<T>` | (required) | `useComparison` / `useTreeComparison` の戻り値をそのまま渡す(`visibleLeft` / `visibleRight` / `leftDiffs` / `rightDiffs` / `compareFields`、alignRows 利用時は `placeholders`、木モードの「差分のみ」では `contextRows` も使用)。 |
+| `comparison` | `ComparisonViewModel<T>` | (required) | `useComparison` / `useTreeComparison` の戻り値をそのまま渡す(`visibleLeft` / `visibleRight` / `leftDiffs` / `rightDiffs` / `compareFields`、alignRows 利用時は `placeholders`、木モードでは `contextRows` / `descendantDiffCounts` も使用)。 |
 | `columns` | `readonly GridColumn<T>[]` | (required) | 利用側の列定義(両ペイン共通)。参照安定化(浅い構造比較)される。 |
 | `keyColumnKeys` | `readonly string[]` | — | 突き合わせキー相当の列キー。`left-only` / `right-only` 行でその列のセルを強調。 |
 | `leftHeader` / `rightHeader` | `ReactNode` | — | ペイン上部のスロット。片側だけ指定しても両ペインに(空の)スロットを描画して上端を揃える。 |
 | `gridProps` | `ComparisonGridProps<T>` | — | 両ペイン共通の `SpreadsheetGrid` props(下記「gridProps の透過」)。 |
 | `leftGridProps` / `rightGridProps` | `ComparisonGridProps<T>` | — | 片側だけの上書き(`gridProps` の上に浅くマージ)。`ref` を片側ずつ渡す用途など。 |
 | `showDiffLabelColumn` | `boolean` | `false` | 差分ラベル列を自動追加する。 |
-| `diffLabelColumn` | `DiffLabelColumnOptions<T>` | `{ key: 'cmpgDiffLabel', title: '差分', width: 150, position: 'end' }` | ラベル列の調整(`GridColumn` の任意プロパティ + `position: 'start' \| 'end' \| number`)。`getValue` はライブラリが与える。 |
+| `diffLabelColumn` | `DiffLabelColumnOptions<T>` | `{ key: 'cmpgDiffLabel', title: '差分', width: 150, position: 'end' }` | ラベル列の調整(`GridColumn` の任意プロパティ + `position: 'start' \| 'end' \| number` + `descendantDiffLabel: (count) => string`)。`getValue` はライブラリが与える。木モードでは自身のラベルが空で配下に差分がある行に `descendantDiffLabel(count)`(既定 `配下に差分 n 件`)を出す。 |
 | `enableRowHighlight` | `boolean` | `true` | `same` 以外の行へ `.cmpg-row-diff` を付与。 |
 | `enableKeyCellHighlight` | `boolean` | `true` | `keyColumnKeys` 列のセル強調。 |
 | `enableFieldCellHighlight` | `boolean` | `true` | `compareFields` 対応列のセル強調。 |
@@ -332,6 +339,7 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 | `keyColumnKeys` | `readonly string[]` | — | 同上。 |
 | `placeholderRows` | `ReadonlySet<T>` | — | この側の `rows` に含まれるプレースホルダ行(`placeholders.left` 等)。`.cmpg-row-placeholder` を付与する。 |
 | `contextRows` | `ReadonlySet<T>` | — | この側の `rows` に含まれる文脈行(`useTreeComparison().contextRows.left` 等)。`.cmpg-row-context` を付与する。 |
+| `descendantDiffCounts` | `ReadonlyMap<T, number>` | — | この側のロールアップ(`useTreeComparison().descendantDiffCounts.left` 等)。自身が same で配下に差分がある行へ `.cmpg-row-rollup` を付け、差分ラベル列に配下差分ラベルを出す。 |
 | `header` | `ReactNode` | — | ヘッダースロット。 |
 | `showHeader` | `boolean` | `header !== undefined` | スロットの描画有無(片側だけヘッダーがある場合の高さ揃えに)。 |
 | `gridProps` | `ComparisonGridProps<T>` | — | 透過 props。 |
@@ -371,6 +379,7 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 | `.cmpg-cell-diff` | セル | 強調セル共通。修飾子 `--key`(キー列 × 片側のみ行)/ `--field`(差分フィールド列 × field-diff 行)。 |
 | `.cmpg-row-placeholder` | 行コンテナ + 各データセル | alignRows で欠損側に入るプレースホルダ行。差分ハイライトとは独立で、`enableRowHighlight={false}` でも付与される。 |
 | `.cmpg-row-context` | 行コンテナ + 各データセル | 木モードの「差分のみ」で差分行の祖先として残る文脈行(`kind` は `same`)。差分ハイライトとは独立で、`enableRowHighlight={false}` でも付与される。 |
+| `.cmpg-row-rollup` | 行コンテナ + 各データセル | 木モードで、自身は `same` だが配下に差分がある行(ロールアップ)。差分ハイライトの一種で `enableRowHighlight` に従う。差分行クラスとは同時に付かない。 |
 
 ハイライトの実体は `.ssg-body-cell.cmpg-row-diff { background }` / `.ssg-body-cell.cmpg-cell-diff { color; font-weight }`(特異度 (0,2,0))。行ホバーは `.ssg-body-cell.cmpg-row-diff.ssg-body-cell--row-hovered` で `--cmpg-diff-row-hover-bg` に切り替わります。
 
@@ -389,6 +398,8 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 | `--cmpg-placeholder-row-bg` | `:where(.cmpg-pane)` | `#f3f4f6` | `rgba(148, 163, 184, 0.1)` |
 | `--cmpg-placeholder-row-hover-bg` | `:where(.cmpg-pane)` | `#e5e7eb` | `rgba(148, 163, 184, 0.18)` |
 | `--cmpg-context-row-text` | `:where(.cmpg-pane)` | `#6b7280` | `#9ca3af` |
+| `--cmpg-rollup-row-bg` | `:where(.cmpg-pane)` | `#fefce8` | `rgba(250, 204, 21, 0.07)` |
+| `--cmpg-rollup-row-hover-bg` | `:where(.cmpg-pane)` | `#fef9c3` | `rgba(250, 204, 21, 0.12)` |
 
 上書きは `.cmpg-pane { --cmpg-diff-row-bg: ... }`(light)/ `.cmpg-pane .ssg-theme-dark { ... }`(dark)。`:where()` 定義のため読み込み順に依らず勝ちます。
 
@@ -396,7 +407,7 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 
 色覚多様性向けのオプトインプリセット。**利用側が** `.cmpg-view` / `.cmpg-pane`(または任意の祖先)へ `cmpg-colors-cvd` クラスを付与すると:
 
-- 差分行の黄系 → **青系**(light: blue-100 `#dbeafe` / hover blue-200)、強調文字の赤 → **橙系**(orange-800 `#9a3412`。白地でコントラスト比 約 7:1)。ダークは青 α / orange-300 に差し替え。
+- 差分行の黄系 → **青系**(light: blue-100 `#dbeafe` / hover blue-200)、強調文字の赤 → **橙系**(orange-800 `#9a3412`。白地でコントラスト比 約 7:1)。ダークは青 α / orange-300 に差し替え。ロールアップ行は blue-50 `#eff6ff` / hover blue-100。
 - 差分セル(`.cmpg-cell-diff`)に**下線**を追加(色に依らない手掛かり)。
 
 トークンは特異度 0 のため、利用側の `--cmpg-*` 上書きはプリセットにも勝ちます。プレースホルダ行の灰系は共通です。
@@ -420,4 +431,4 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 
 初版時の候補はすべて実装済みです: 左右整列モード(`alignRows`)/ スクロール同期(`enableScrollSync`)/ エクスポート(`getComparisonExportData`)/ 差分ジャンプ(`useComparisonNavigation`)/ マニュアル入力(`useManualRows`)/ 色覚多様性プリセット(`.cmpg-colors-cvd`)。経緯と設計判断は `docs/DESIGN_NOTES.md` を参照。
 
-階層比較(`buildComparisonTree` / `flattenComparisonTree` / `alignComparisonTree` / `useTreeComparison`)は batch 15 で追加。残候補: 親への差分ロールアップ表示(「配下に差分あり」マーク。`getTreeInfo` + `getDiff` で利用側でも書ける)/ サブツリーの折りたたみ。
+階層比較(`buildComparisonTree` / `flattenComparisonTree` / `alignComparisonTree` / `useTreeComparison`)は batch 15、ロールアップ(`countDescendantDiffs` / `.cmpg-row-rollup` / 配下差分ラベル)は batch 16a で追加。残候補: サブツリーの折りたたみ。

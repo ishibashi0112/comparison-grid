@@ -37,7 +37,7 @@ const columns: GridColumn<Row>[] = [
 const leftTree = buildComparisonTree([row('A', 1), row('B', 2), row('C', 3), row('E', 1)], { getLevel }).roots;
 const rightTree = buildComparisonTree([row('A', 1), row('B', 2), row('C', 3, 2), row('E', 1)], { getLevel }).roots;
 
-function Harness({ showDiffOnly }: { showDiffOnly: boolean }) {
+function Harness({ showDiffOnly, showDiffLabelColumn }: { showDiffOnly: boolean; showDiffLabelColumn?: boolean }) {
   const comparison = useTreeComparison<Row>({
     left: leftTree,
     right: rightTree,
@@ -45,7 +45,13 @@ function Harness({ showDiffOnly }: { showDiffOnly: boolean }) {
     compareFields,
     showDiffOnly,
   });
-  return <ComparisonView<Row> comparison={comparison} columns={columns} />;
+  return (
+    <ComparisonView<Row>
+      comparison={comparison}
+      columns={columns}
+      showDiffLabelColumn={showDiffLabelColumn}
+    />
+  );
 }
 
 const textsOf = (elements: NodeListOf<Element>) =>
@@ -67,6 +73,21 @@ describe('ComparisonView(木モード)', () => {
     // E は表示されない。
     const allTexts = textsOf(container.querySelectorAll('.cmpg-pane--left .ssg-body-cell'));
     expect(allTexts.has('E')).toBe(false);
+  });
+
+  it('自身は same で配下に差分がある行に .cmpg-row-rollup が付き、差分ラベル列に配下差分ラベルが出る', () => {
+    const { container } = render(<Harness showDiffOnly={false} showDiffLabelColumn />);
+    const rollupCells = container.querySelectorAll('.cmpg-pane--left .ssg-body-cell.cmpg-row-rollup');
+    const rollupTexts = textsOf(rollupCells);
+    expect(rollupTexts.has('A')).toBe(true);
+    expect(rollupTexts.has('B')).toBe(true);
+    expect(rollupTexts.has('C')).toBe(false);
+    expect(rollupTexts.has('E')).toBe(false);
+    expect(rollupTexts.has('配下に差分 1 件')).toBe(true);
+    // 差分行には rollup が付かず、差分ラベルは自身のもの。
+    const diffCells = container.querySelectorAll('.cmpg-pane--left .ssg-body-cell.cmpg-row-diff');
+    expect(textsOf(diffCells).has('数量違い')).toBe(true);
+    Array.from(diffCells).forEach((cell) => expect(cell.classList.contains('cmpg-row-rollup')).toBe(false));
   });
 
   it('フィルタ無しでは文脈行クラスは付かない', () => {

@@ -80,6 +80,18 @@ describe('useTreeComparison', () => {
     expect(result.current.getTreeInfo(row('Z', 1))).toBeUndefined();
   });
 
+  it('ロールアップ: 配下の差分行数を行ごとに引ける(自身は数えない)', () => {
+    const { result } = renderTree();
+    // 左 A の配下: C(field-diff)+ D(left-only)= 2。B の配下: C = 1。
+    expect(result.current.getDescendantDiffCount(left[0])).toBe(2);
+    expect(result.current.getDescendantDiffCount(left[1])).toBe(1);
+    expect(result.current.getDescendantDiffCount(left[2])).toBe(0);
+    // 右 A の配下: C + N + N1 = 3。
+    expect(result.current.getDescendantDiffCount(right[0])).toBe(3);
+    expect(result.current.descendantDiffCounts.right.get(right[3])).toBe(1); // N: N1
+    expect(result.current.descendantDiffCounts.left.has(left[4])).toBe(false); // E
+  });
+
   it('「差分のみ」は差分行に加えてその祖先を文脈行として残す', () => {
     const { result } = renderTree({ showDiffOnly: true });
     expect(result.current.effectiveShowDiffOnly).toBe(true);

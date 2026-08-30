@@ -29,10 +29,24 @@ export const CMPG_CLASS_NAMES = {
   rowPlaceholder: 'cmpg-row-placeholder',
   /** 木モードの「差分のみ」で差分行の祖先として残る文脈行(行コンテナ + 各データセル)。 */
   rowContext: 'cmpg-row-context',
+  /** 木モードで、自身は same だが配下に差分がある行(ロールアップ。行コンテナ + 各データセル)。 */
+  rowRollup: 'cmpg-row-rollup',
 } as const;
 
 /** 差分ラベル列の既定キー。 */
 export const DEFAULT_DIFF_LABEL_COLUMN_KEY = 'cmpgDiffLabel';
+
+/** 配下差分ラベルの既定(木モードの差分ラベル列で、自身は same だが配下に差分がある行に出す)。 */
+export const formatDefaultDescendantDiffLabel = (count: number): string => `配下に差分 ${count} 件`;
+
+/** ロールアップの行クラス。自身が same(差分クラスが付かない)で配下に差分があるときだけ付ける。 */
+export const getRollupRowClassName = <T>(
+  diff: ComparisonRowDiff<T> | undefined,
+  descendantDiffCount: number | undefined,
+): string | undefined =>
+  diff?.kind === 'same' && descendantDiffCount !== undefined && descendantDiffCount > 0
+    ? CMPG_CLASS_NAMES.rowRollup
+    : undefined;
 
 export const getDiffRowClassName = <T>(
   diff: ComparisonRowDiff<T> | undefined,
@@ -140,40 +154,58 @@ export type RowClassNameGetter<T> = (
   ctx: RowStyleContext<T>,
 ) => string | undefined;
 
-/** ライブラリの行クラス(差分 / プレースホルダ / 文脈行)と利用側 getRowClassName を合成します(ctx は利用側へ透過)。
- *  プレースホルダ行 / 文脈行のクラスは差分ハイライトではないため enableRowHighlight に依らず付与します。 */
+/** ライブラリの行クラス(差分 / プレースホルダ / 文脈行 / ロールアップ)と利用側 getRowClassName を合成します
+ *  (ctx は利用側へ透過)。プレースホルダ行 / 文脈行のクラスは差分ハイライトではないため enableRowHighlight に
+ *  依らず付与し、ロールアップは差分ハイライトの一種として enableRowHighlight に従います。 */
 export const composeRowClassName = <T>(
   diffs: ComparisonDiffMap<T>,
   userGetRowClassName: RowClassNameGetter<T> | undefined,
   enableRowHighlight: boolean,
   placeholderRows?: ReadonlySet<T>,
   contextRows?: ReadonlySet<T>,
+  descendantDiffCounts?: ReadonlyMap<T, number>,
 ): RowClassNameGetter<T> | undefined => {
   const hasPlaceholders = placeholderRows !== undefined && placeholderRows.size > 0;
   const hasContext = contextRows !== undefined && contextRows.size > 0;
   if (!enableRowHighlight && !hasPlaceholders && !hasContext) return userGetRowClassName;
-  return (row, rowIndex, ctx) =>
-    cx(
+  const hasRollup =
+    enableRowHighlight && descendantDiffCounts !== undefined && descendantDiffCounts.size > 0;
+  return (row, rowIndex, ctx) => {
+    const diff = diffs.get(row);
+    return cx(
       hasPlaceholders && placeholderRows.has(row) ? CMPG_CLASS_NAMES.rowPlaceholder : undefined,
       hasContext && contextRows.has(row) ? CMPG_CLASS_NAMES.rowContext : undefined,
-      enableRowHighlight ? getDiffRowClassName(diffs.get(row)) : undefined,
+      enableRowHighlight ? getDiffRowClassName(diff) : undefined,
+      hasRollup ? getRollupRowClassName(diff, descendantDiffCounts.get(row)) : undefined,
       userGetRowClassName?.(row, rowIndex, ctx),
     );
+  };
 };
 
-/** 差分ラベル列を挿入した列配列を返します。 */
+/** 差分ラベル列を挿入した列配列を返します。descendantDiffCounts を渡すと、自身のラベルが空で配下に差分がある行に
+ *  配下差分ラベル(既定 `配下に差分 n 件`)を出します。 */
 export const insertDiffLabelColumn = <T>(
   columns: readonly GridColumn<T>[],
   diffs: ComparisonDiffMap<T>,
   options: DiffLabelColumnOptions<T> | undefined,
+  descendantDiffCounts?: ReadonlyMap<T, number>,
 ): GridColumn<T>[] => {
-  const { position = 'end', ...override } = options ?? {};
+  const {
+    position = 'end',
+    descendantDiffLabel = formatDefaultDescendantDiffLabel,
+    ...override
+  } = options ?? {};
   const column: GridColumn<T> = {
     key: DEFAULT_DIFF_LABEL_COLUMN_KEY,
     title: '差分',
     width: 150,
     ...override,
-    getValue: (row) => diffs.get(row)?.label ?? '',
+    getValue: (row) => {
+      const label = diffs.get(row)?.label ?? '';
+      if (label !== '' || !descendantDiffCounts) return label;
+      const count = descendantDiffCounts.get(row) ?? 0;
+      return count > 0 ? descendantDiffLabel(count) : '';
+    },
   };
   const index =
     position === 'start'

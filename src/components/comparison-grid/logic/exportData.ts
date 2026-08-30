@@ -17,10 +17,17 @@ const readCellValue = <T>(column: GridColumn<T>, row: T): unknown => {
 
 /** 比較結果 1 側ぶんのエクスポートデータを返します(純関数)。 */
 export function getComparisonExportData<T>(options: ComparisonExportOptions<T>): GridExportData {
-  const { rows, diffs, columns, showDiffLabelColumn = true, diffLabelColumn } = options;
+  const {
+    rows,
+    diffs,
+    columns,
+    showDiffLabelColumn = true,
+    diffLabelColumn,
+    descendantDiffCounts,
+  } = options;
   const visibleColumns = columns.filter((column) => column.visible !== false);
   const exportColumns = showDiffLabelColumn
-    ? insertDiffLabelColumn(visibleColumns, diffs, diffLabelColumn)
+    ? insertDiffLabelColumn(visibleColumns, diffs, diffLabelColumn, descendantDiffCounts)
     : visibleColumns;
 
   return {

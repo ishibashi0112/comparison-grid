@@ -48,6 +48,7 @@ src/components/comparison-grid/
   logic/exportData.ts   純ロジック: エクスポートデータ生成(getExportData() と同形)
   logic/tree.ts         純ロジック: 階層比較(平坦な行 → 木 / 木 → パスキー付き平坦化・issues 報告)
   logic/alignTree.ts    純ロジック: 木モードの左右整列(構造マージ)
+  logic/rollup.ts       純ロジック: ロールアップ(行 → 配下の差分行数)
   logic/cx.ts           className 連結
   hooks/useStableValue.ts 参照安定化(浅い構造比較)
   hooks/useComparison.ts  compare() の React 接続、alignRows / 差分のみフィルタの導出
