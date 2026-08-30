@@ -101,6 +101,14 @@
 - **差分ラベル列**: 自身のラベルが空で配下に差分がある行に `descendantDiffLabel(count)`(既定 `配下に差分 n 件`)。`DiffLabelColumnOptions.descendantDiffLabel` で差し替え。`getComparisonExportData` にも `descendantDiffCounts` を渡せば同じ規則でエクスポートされる。
 - 配線は `ComparisonView` → `ComparisonPane`(`descendantDiffCounts` prop)→ `composeRowClassName` / `insertDiffLabelColumn`。`ComparisonPane` を直接使う場合は `descendantDiffCounts={comparison.descendantDiffCounts.left}` を渡す。
 
+### 実装済み(2026-08-30・batch 16b。サブツリーの折りたたみ)
+
+- **state はキー(`matchKey`)の `Set` を利用側が持つ**(fully controlled)。行オブジェクトや行位置ではなくキーにしたのは、(1) キーが左右共通なので 1 つのキーで両ペインの対が同時に畳まれる、(2) データ差し替え(再展開)や整列 / フィルタの切り替えをまたいで維持できる、ため。トグル用のヘルパーフックは作らない(`useState` + `Set` の 5 行で足り、API を増やさない)。
+- **純ロジック `collectCollapsedDescendants`**: 深さ優先順(親が子より先)を利用した 1 パスで「隠れる行 = 折りたたんだ行の子孫」を返す。折りたたんだ行自身は残す。
+- **フックでの適用**: 平坦 / 整列の両方で「隠れる行」を除く。整列では対の単位(どちらかの側が隠れる対は落とす)。「差分のみ」と併用しても文脈行は残り、配下だけ隠れる(ロールアップの件数は表示に依らず全子孫を数える)。
+- **展開ボタンはライブラリが描画しない。** 列は利用側のもの(サイドカー原則)なので、`getTreeInfo(row).hasChildren` / `isCollapsed(row)` / `matchKey` を使って利用側の列に組む(README レシピ / デモの Level 列)。デモでは Level 列を `createLevelColumn(アクセサ)` で組み立て、インデントも `getTreeInfo(row).depth` に切り替えた。「すべて展開」ボタンを追加。
+- 差分ジャンプは表示行が変わると現在位置がリセットされる既存挙動のまま(折りたたみで停止位置が変わるため妥当)。
+
 ## 6. 環境メモ
 
 - spreadsheet-grid: `~/dev/datasheet-grid`(GitHub `ishibashi0112/datasheet-grid`)。v0.29.0 = npm latest(2026-08-29・提案対応リリース「proposals batch 1〜6」)。ss2602 は `^0.16.0` 固定なので、ライブラリ導入時に 0.29 系へ上げる必要がある(0.17〜0.28 で export scope の改名や既定値変更あり)。

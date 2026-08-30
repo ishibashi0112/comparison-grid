@@ -135,6 +135,25 @@
   box-sizing: border-box;
 }
 
+.demo-expander {
+  flex: 0 0 auto;
+  width: 14px;
+  margin-right: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.demo-expander--leaf {
+  display: inline-block;
+  cursor: default;
+}
+
 .demo-detail-button {
   padding: 1px 4px;
   border: 0;

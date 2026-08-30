@@ -1,7 +1,7 @@
 // ss2602(部品構成比較アプリ)の比較画面を comparison-grid で再現するデモです。
 //   利用側が書くのは「行の型 / データ / 列定義 / 比較設定」だけで、差分計算・ラベル生成・
 //   行 / セルのハイライト・差分のみフィルタはライブラリ側が担います(引き継ぎ書のゴール像)。
-import { useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useMemo, useState, type FormEvent } from 'react';
 import type { GridColumn, GridTheme } from '@ishibashi0112/spreadsheet-grid';
 import {
   ComparisonView,
@@ -10,6 +10,7 @@ import {
   useTreeComparison,
   type CompareField,
   type ComparisonGridProps,
+  type ComparisonTreeInfo,
 } from './components/comparison-grid';
 import {
   BOM_DATASETS,
@@ -34,18 +35,47 @@ const getLevel = (row: BomRow) => row.levelNo;
 const getItemCode = (row: BomRow) => row.itemCode;
 const getRepresentativeCode = (row: BomRow) => row.reprItemCode;
 
-// Level 列: 階層の深さに応じて左インデントを付けて表示する。
-//   左右整列(alignRows)のプレースホルダ行は空オブジェクトで来るため、renderCell を持つ列は
-//   ここで空表示に落とす(既定の getValue 列は undefined → 空セルになるので対応不要)。
-const renderLevelCell = ({ row }: { row: BomRow }) => {
-  if (!row.levelNo) return null;
-  const level = Math.max(row.levelNo, 1);
-  return (
-    <div className="demo-level-cell" style={{ paddingLeft: `${(level - 1) * 12}px` }}>
-      {level}
-    </div>
-  );
+// Level 列: 階層の深さ(getTreeInfo の depth)に応じて左インデントを付け、子を持つ行には折りたたみの
+//   展開ボタンを出す。ボタンは行の matchKey(左右共通)でトグルするため、片側を畳めば相手側の対も畳まれる。
+//   左右整列(alignRows)のプレースホルダ行は階層情報を持たない(getTreeInfo が undefined)ので空表示に落とす。
+type TreeAccessors = {
+  getTreeInfo: (row: BomRow) => ComparisonTreeInfo<BomRow> | undefined;
+  isCollapsed: (row: BomRow) => boolean;
+  toggleCollapsed: (key: string) => void;
 };
+
+const createLevelColumn = ({
+  getTreeInfo,
+  isCollapsed,
+  toggleCollapsed,
+}: TreeAccessors): GridColumn<BomRow> => ({
+  key: 'levelNo',
+  title: 'Level',
+  width: 76,
+  renderCell: ({ row }) => {
+    const info = getTreeInfo(row);
+    if (!info) return null;
+    const collapsed = isCollapsed(row);
+    return (
+      <div className="demo-level-cell" style={{ paddingLeft: `${info.depth * 12}px` }}>
+        {info.hasChildren ? (
+          <button
+            type="button"
+            className="demo-expander"
+            aria-label={collapsed ? '展開' : '折りたたむ'}
+            aria-expanded={!collapsed}
+            onClick={() => toggleCollapsed(info.matchKey)}
+          >
+            {collapsed ? '▸' : '▾'}
+          </button>
+        ) : (
+          <span className="demo-expander demo-expander--leaf" />
+        )}
+        {row.levelNo}
+      </div>
+    );
+  },
+});
 
 // 品目マスタを開くボタン列(右端固定)。
 const detailColumn: GridColumn<BomRow> = {
@@ -66,9 +96,9 @@ const detailColumn: GridColumn<BomRow> = {
     ) : null,
 };
 
-// 2. 列定義: 利用側の型 T に対する GridColumn をそのまま書く。
-const columns: GridColumn<BomRow>[] = [
-  { key: 'levelNo', title: 'Level', width: 60, renderCell: renderLevelCell },
+// 2. 列定義: 利用側の型 T に対する GridColumn をそのまま書く。Level 列だけは比較結果のアクセサを
+//    受け取るため、コンポーネント内で createLevelColumn を先頭に足して組み立てる。
+const STATIC_COLUMNS: GridColumn<BomRow>[] = [
   { key: 'itemCode', title: '品目コード', width: 110 },
   { key: 'reprItemCode', title: '代表品番', width: 100 },
   { key: 'itemName', title: '品目名', width: 160 },
@@ -104,6 +134,16 @@ export default function App() {
   const [isReprItemMode, setIsReprItemMode] = useState(false);
   const [alignRows, setAlignRows] = useState(false);
   const [syncScroll, setSyncScroll] = useState(false);
+  // 折りたたみ: 突き合わせキー(matchKey)の集合を利用側の state で持つ。
+  const [collapsedKeys, setCollapsedKeys] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleCollapsed = useCallback((key: string) => {
+    setCollapsedKeys((previous) => {
+      const next = new Set(previous);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
   const [theme, setTheme] = useState<GridTheme>('light');
   const [cvdColors, setCvdColors] = useState(false);
   const [enableGridFeatures, setEnableGridFeatures] = useState(false);
@@ -123,7 +163,21 @@ export default function App() {
     compareFields: COMPARE_FIELDS,
     showDiffOnly,
     alignRows,
+    collapsedKeys,
   });
+
+  // Level 列は比較結果のアクセサ(getTreeInfo / isCollapsed)を閉じ込めるため、ここで組み立てる。
+  const columns = useMemo<GridColumn<BomRow>[]>(
+    () => [
+      createLevelColumn({
+        getTreeInfo: comparison.getTreeInfo,
+        isCollapsed: comparison.isCollapsed,
+        toggleCollapsed,
+      }),
+      ...STATIC_COLUMNS,
+    ],
+    [comparison.getTreeInfo, comparison.isCollapsed, toggleCollapsed],
+  );
 
   // 差分ジャンプ: グリッドのハンドル ref はフックが生成し、leftGridProps / rightGridProps で配線する。
   const navigation = useComparisonNavigation<BomRow>({ comparison, alignRows });
@@ -184,6 +238,7 @@ export default function App() {
     setLeftRows([]);
     setRightRows([]);
     setShowDiffOnly(false);
+    setCollapsedKeys(new Set());
   };
 
   const { summary } = comparison;
@@ -293,6 +348,14 @@ export default function App() {
             />
             色覚多様性配色
           </label>
+          <button
+            type="button"
+            className="demo-button"
+            onClick={() => setCollapsedKeys(new Set())}
+            disabled={collapsedKeys.size === 0}
+          >
+            すべて展開
+          </button>
           <button
             type="button"
             className="demo-button"

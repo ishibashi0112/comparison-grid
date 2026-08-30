@@ -473,6 +473,10 @@ export type UseTreeComparisonOptions<T> = Omit<UseComparisonOptions<T>, 'left' |
   ComparisonTreeKeyOptions<T> & {
     left: readonly ComparisonTreeNode<T>[];
     right: readonly ComparisonTreeNode<T>[];
+    /** 折りたたむ行の突き合わせキー(matchKey)の集合(利用側の state)。キーは左右で共通なので、
+     *  1 つのキーで両ペインの対(サブツリー)が同時に隠れる。子孫は visibleLeft / visibleRight から除かれ、
+     *  折りたたんだ行自身は残る。未指定 / 空なら折りたたみ無し。 */
+    collapsedKeys?: ReadonlySet<string>;
   };
 
 export type UseTreeComparisonResult<T> = UseComparisonResult<T> & {
@@ -485,4 +489,6 @@ export type UseTreeComparisonResult<T> = UseComparisonResult<T> & {
   descendantDiffCounts: ComparisonDescendantDiffCounts<T>;
   /** 左右どちらの行でも配下の差分行数を引ける参照関数(無ければ 0)。 */
   getDescendantDiffCount: (row: T) => number;
+  /** その行が折りたたまれているか(collapsedKeys にその行の matchKey が含まれるか)。展開ボタンの表示に。 */
+  isCollapsed: (row: T) => boolean;
 };

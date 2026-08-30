@@ -3,7 +3,7 @@
 //   - 木からのキー導出: パス / 代表コードの子孫への伝播 / 兄弟重複の '#n'
 //   - 「同じサブ ASSY が 2 箇所で使われる」構成でも親違いの子が突き合わないこと(compare() との結合)
 import { describe, it, expect } from 'vitest';
-import { buildComparisonTree, flattenComparisonTree } from './tree';
+import { buildComparisonTree, collectCollapsedDescendants, flattenComparisonTree } from './tree';
 import { compare } from './compare';
 import type { ComparisonTreeNode } from '../model/types';
 
@@ -236,5 +236,23 @@ describe('木のキー + compare(): 親違いの同品番は突き合わない',
     const result = compareTrees(left, right, true);
     expect(result.annotatedLeft.map((e) => e.diff.kind)).toEqual(['same', 'field-diff']);
     expect(result.annotatedLeft[1].diff.counterpart).toBe(right[1]);
+  });
+});
+
+describe('collectCollapsedDescendants', () => {
+  // A(B(C), D) / E
+  const rows = [row('A', 1), row('B', 2), row('C', 3), row('D', 2), row('E', 1)];
+  const flattened = flattenComparisonTree(buildComparisonTree(rows, { getLevel }).roots, { getCode });
+  const hiddenCodes = (keys: string[]) =>
+    [...collectCollapsedDescendants(flattened, new Set(keys))].map(getCode).sort();
+
+  it('折りたたんだ行の子孫(孫も)を集め、自身と兄弟は含めない', () => {
+    expect(hiddenCodes(['A'])).toEqual(['B', 'C', 'D']);
+    expect(hiddenCodes(['A/B'])).toEqual(['C']);
+  });
+
+  it('複数キーは和集合になり、存在しないキーは無視される', () => {
+    expect(hiddenCodes(['A/B', 'E', 'X'])).toEqual(['C']);
+    expect(hiddenCodes([])).toEqual([]);
   });
 });

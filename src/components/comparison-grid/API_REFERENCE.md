@@ -4,7 +4,7 @@
 > `view/*.tsx`)から手で起こした公開 API のスナップショットです。**型を変更したら本ファイルも同期してください。**
 > spreadsheet-grid 側の props / 型は [spreadsheet-grid の API_REFERENCE](https://github.com/ishibashi0112/datasheet-grid/blob/main/src/components/spreadsheet-grid/API_REFERENCE.md) を参照。
 
-最終更新: 2026-08-30(batch 15a / 15b / 16a: 階層比較 — 純ロジック + `useTreeComparison` + 文脈行 + ロールアップ)。
+最終更新: 2026-08-30(batch 15〜16: 階層比較 — 純ロジック + `useTreeComparison` + 文脈行 + ロールアップ + 折りたたみ)。
 
 ## 設計の要点
 
@@ -182,6 +182,10 @@ const result = compare(flatLeft.rows, flatRight.rows, {
 
 規則: 兄弟リスト単位で左の順に対を作り(相手は**同じ兄弟リストに居る** counterpart だけ。別の場所に居る相手は片側のみ扱い)、右にしか無いサブツリーは**直前に対になった兄弟の直後**に挿入します(先行する対が無ければ最初の対の直前、対が 1 つも無ければ末尾)。片側のみのサブツリーは丸ごと相手側プレースホルダと組みます。ASSY 内に追加された部品がその ASSY の直下に並び、左右の親子関係が崩れません。
 
+### `collectCollapsedDescendants<T>(flattened, collapsedKeys): Set<T>`
+
+折りたたみの純ロジック。`flattenComparisonTree` の結果と、折りたたむ行の `matchKey` の集合から、**隠れる行(折りたたんだ行の子孫。自身は含まない)** を返します。`useTreeComparison` の `collapsedKeys` が内部で使うものと同じです(headless で自前の表示配列を作るときに)。
+
 ### `countDescendantDiffs<T>(annotated, infos): Map<T, number>`
 
 ロールアップの純ロジック。`compare()` の注釈行(`annotatedLeft` 等)と `flattenComparisonTree` の `infos` から、行ごとに**配下(子孫)の差分行数**(`kind !== 'same'` の行数。自身は数えない)を返します。配下に差分が無い行は Map に載りません。`useTreeComparison` はこれを `descendantDiffCounts` として返し、「差分のみ」の文脈行判定(自身は same で配下に差分がある行)にも使います。
@@ -223,12 +227,14 @@ const result = compare(flatLeft.rows, flatRight.rows, {
 | --- | --- | --- | --- |
 | `left` / `right` | `readonly ComparisonTreeNode<T>[]` | (required) | 左右の木(`buildComparisonTree(rows, …).roots` など)。**同じ参照を渡し続ければ表示配列の参照も安定**する(`useMemo` で組み立てる)。 |
 | `getCode` / `getRepresentativeCode` / `separator` | `ComparisonTreeKeyOptions<T>` | — | キー導出設定(`flattenComparisonTree` と同じ)。`getRepresentativeCode` を付け外しすると「代表品番比較」の ON / OFF になる。 |
+| `collapsedKeys` | `ReadonlySet<string>` | — | 折りたたむ行の突き合わせキー(`matchKey`)の集合(利用側の state)。キーは左右共通なので 1 つのキーで両ペインの対(サブツリー)が同時に隠れる。子孫は `visibleLeft` / `visibleRight` から除かれ、折りたたんだ行自身は残る。表示行が変わるため差分ジャンプの現在位置はリセットされる。 |
 | `showDiffOnly` / `alignRows` / `createPlaceholderRow` / `compareFields` / `labels` / `formatDiffLabel` / `duplicateKeyPolicy` | — | — | `useComparison` と同じ。 |
 
 `useComparison` との挙動の違い:
 
 - **「差分のみ」は差分行に加えて、その祖先(文脈行)を残します。** `C3001` の差分が「どの ASSY の」か分かるようにするため。文脈行は `kind === 'same'` のままで、`contextRows` に集約され `ComparisonView` が `.cmpg-row-context` を付与します(既定で文字色が薄くなる)。差分の祖先ではない `same` 行(葉も ASSY も)は落ちます。
 - **`alignRows` は構造マージ(`alignComparisonTree`)。** 右にしか無いサブツリーが末尾ではなく兄弟の位置に入ります。「差分のみ」との併用は対の単位でフィルタ(どちらかの側が残す行なら対ごと残す)。
+- **折りたたみ(`collapsedKeys`)** は行位置ではなくキーで持つため、データの差し替えや整列 / フィルタの切り替えをまたいで維持されます。展開ボタンはライブラリが描画せず、利用側の列で `getTreeInfo(row).hasChildren` / `isCollapsed(row)` / `getTreeInfo(row).matchKey` を使って組みます(README レシピ)。「差分のみ」との併用では、折りたたんだ文脈行は残り配下だけ隠れます。
 - `visibleLeft` / `visibleRight` は平坦化した配列で、入力(木)と同一参照にはなりません。
 
 戻り値に加わるもの:
@@ -239,6 +245,7 @@ const result = compare(flatLeft.rows, flatRight.rows, {
 | `getTreeInfo` | `(row: T) => ComparisonTreeInfo<T> \| undefined` | 左右どちらの行でも階層情報(`depth` / `parent` / `hasChildren` / `occurrence` / `matchKey`)を引ける(Level 列のインデント等に。プレースホルダ行は `undefined`)。 |
 | `descendantDiffCounts` | `{ left: ReadonlyMap<T, number>; right: ReadonlyMap<T, number> }` | ロールアップ(行 → 配下の差分行数)。`ComparisonView` へ `comparison` を渡せば、自身は same で配下に差分がある行へ `.cmpg-row-rollup` が付き、差分ラベル列に配下差分ラベル(既定 `配下に差分 n 件`)が出る。 |
 | `getDescendantDiffCount` | `(row: T) => number` | 左右どちらの行でも配下の差分行数を引ける(無ければ `0`。自作列の「配下に差分あり」マーク等に)。 |
+| `isCollapsed` | `(row: T) => boolean` | その行が折りたたまれているか(`collapsedKeys` にその行の `matchKey` が含まれるか)。展開ボタンの向きに。 |
 
 ```tsx
 const leftTree = useMemo(() => buildComparisonTree(leftRows, { getLevel }), [leftRows]);
@@ -431,4 +438,4 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 
 初版時の候補はすべて実装済みです: 左右整列モード(`alignRows`)/ スクロール同期(`enableScrollSync`)/ エクスポート(`getComparisonExportData`)/ 差分ジャンプ(`useComparisonNavigation`)/ マニュアル入力(`useManualRows`)/ 色覚多様性プリセット(`.cmpg-colors-cvd`)。経緯と設計判断は `docs/DESIGN_NOTES.md` を参照。
 
-階層比較(`buildComparisonTree` / `flattenComparisonTree` / `alignComparisonTree` / `useTreeComparison`)は batch 15、ロールアップ(`countDescendantDiffs` / `.cmpg-row-rollup` / 配下差分ラベル)は batch 16a で追加。残候補: サブツリーの折りたたみ。
+階層比較(`buildComparisonTree` / `flattenComparisonTree` / `alignComparisonTree` / `useTreeComparison`)は batch 15、ロールアップ(`countDescendantDiffs` / `.cmpg-row-rollup` / 配下差分ラベル)は batch 16a、折りたたみ(`collapsedKeys` / `isCollapsed` / `collectCollapsedDescendants`)は batch 16b で追加。展開ボタンの UI は利用側の列で組む(README レシピ)。

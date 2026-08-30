@@ -5,6 +5,7 @@
 //     (Map<行, ComparisonTreeInfo>)で返します。キーは「親のキー + 区切り + 自セグメント」で、セグメントは
 //     代表コード(あれば)で置き換えるため、親の置き換えが子孫のキーへ自動で伝播します。
 //     同じ親の下でセグメントが重複したときは出現順の '#n' を付けて区別し、compare() に重複キーを渡しません。
+//   - collectCollapsedDescendants: 折りたたまれた行(matchKey が collapsedKeys に含まれる行)の子孫を集めます。
 //   - 行 T には書き込みません。木のノードは T を包むだけで、T に children を要求しません。
 import type {
   BuildComparisonTreeByLevelOptions,
@@ -203,4 +204,24 @@ export function flattenComparisonTree<T>(
   visit(roots, undefined, undefined, 0);
 
   return { rows, infos };
+}
+
+/** 折りたたまれた行(matchKey が collapsedKeys に含まれる行)の子孫を集めます(純関数)。
+ *  rows が深さ優先順(親が子より先)であることを利用して 1 パスで判定します。折りたたんだ行自身は含めません。 */
+export function collectCollapsedDescendants<T>(
+  flattened: FlattenComparisonTreeResult<T>,
+  collapsedKeys: ReadonlySet<string>,
+): Set<T> {
+  const hidden = new Set<T>();
+  if (collapsedKeys.size === 0) return hidden;
+  const { rows, infos } = flattened;
+  for (const row of rows) {
+    const parent = infos.get(row)?.parent;
+    if (parent === undefined) continue;
+    const parentKey = infos.get(parent)?.matchKey;
+    if (hidden.has(parent) || (parentKey !== undefined && collapsedKeys.has(parentKey))) {
+      hidden.add(row);
+    }
+  }
+  return hidden;
 }

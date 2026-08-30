@@ -12,6 +12,7 @@ export { getComparisonExportData } from './logic/exportData';
 export {
   buildComparisonTree,
   flattenComparisonTree,
+  collectCollapsedDescendants,
   DEFAULT_TREE_KEY_SEPARATOR,
   TREE_KEY_OCCURRENCE_SEPARATOR,
 } from './logic/tree';

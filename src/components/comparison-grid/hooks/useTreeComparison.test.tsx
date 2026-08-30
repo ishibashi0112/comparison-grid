@@ -40,6 +40,7 @@ type Options = {
   showDiffOnly?: boolean;
   alignRows?: boolean;
   getRepresentativeCode?: (r: Row) => string | undefined;
+  collapsedKeys?: ReadonlySet<string>;
 };
 
 const renderTree = (options: Options = {}) =>
@@ -53,6 +54,7 @@ const renderTree = (options: Options = {}) =>
         compareFields,
         showDiffOnly: props.showDiffOnly,
         alignRows: props.alignRows,
+        collapsedKeys: props.collapsedKeys,
       }),
     { initialProps: options },
   );
@@ -149,6 +151,35 @@ describe('useTreeComparison', () => {
     rerender({ left: treeOf(l), right: treeOf(r), getRepresentativeCode: getRepr });
     expect(result.current.annotatedLeft.map((e) => e.diff.kind)).toEqual(['same', 'field-diff']);
     expect(result.current.getDiff(r[1])).toMatchObject({ kind: 'field-diff', matchKey: 'B2003/X' });
+  });
+
+  it('collapsedKeys で折りたたんだ行の子孫が両ペインから隠れ、行自身は残る', () => {
+    const { result, rerender } = renderTree({ collapsedKeys: new Set(['A']) });
+    expect(codes(result.current.visibleLeft)).toEqual(['A', 'E']);
+    expect(codes(result.current.visibleRight)).toEqual(['A', 'E']);
+    expect(result.current.isCollapsed(left[0])).toBe(true);
+    expect(result.current.isCollapsed(right[0])).toBe(true);
+    expect(result.current.isCollapsed(left[1])).toBe(false);
+    // 展開すると平坦化配列がそのまま戻る。
+    rerender({ collapsedKeys: new Set() });
+    expect(codes(result.current.visibleLeft)).toEqual(['A', 'B', 'C', 'D', 'E']);
+    expect(result.current.isCollapsed(left[0])).toBe(false);
+  });
+
+  it('alignRows では対の単位で隠れ、右のみサブツリーも右側のキーで折りたためる', () => {
+    const { result } = renderTree({ alignRows: true, collapsedKeys: new Set(['A/N']) });
+    const { visibleLeft, visibleRight, placeholders } = result.current;
+    expect(codes(visibleLeft, placeholders.left)).toEqual(['A', 'B', 'C', '-', 'D', 'E']);
+    expect(codes(visibleRight, placeholders.right)).toEqual(['A', 'B', 'C', 'N', '-', 'E']);
+    expect(result.current.isCollapsed(right[3])).toBe(true);
+  });
+
+  it('「差分のみ」と併用すると、折りたたんだ文脈行は残り配下だけ隠れる', () => {
+    const { result } = renderTree({ showDiffOnly: true, collapsedKeys: new Set(['A/B']) });
+    expect(codes(result.current.visibleLeft)).toEqual(['A', 'B', 'D']);
+    expect(codes(result.current.visibleRight)).toEqual(['A', 'B', 'N', 'N1']);
+    expect(result.current.contextRows.left.has(left[1])).toBe(true);
+    expect(result.current.getDescendantDiffCount(left[1])).toBe(1);
   });
 
   it('useComparisonNavigation と組み合わせると、整列表示では停止順が行位置順になる', () => {
