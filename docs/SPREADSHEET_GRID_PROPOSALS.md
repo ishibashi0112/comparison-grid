@@ -17,6 +17,7 @@
 | 6 | スタイル用の状態クラスを公開契約にする | ドキュメント | 中 | なし |
 | 7 | `title: ''` の列見出しが `key` にフォールバックする挙動 | 仕様明確化 / 小修正 | 低 | 挙動変更(要判断) |
 | 8 | スクロール位置の取得 / 設定 / 通知 API | 機能追加 | 低(Phase 2 で必要) | 追加のみ |
+| 9 | pointerdown 時の `focus()` に `preventScroll: true`(ページスクロールで単クリックが範囲選択になる) | 不具合修正 | 高 | なし(挙動修正) |
 
 ## 採用結果(2026-08-29 追記)
 
@@ -227,6 +228,22 @@ onScroll?: (position: { top: number; left: number; source: 'user' | 'api' }) => 
 `source: 'api'` は `setScrollPosition` / `scrollTo*` 由来の変化を示し、利用側が双方向同期のループを止めるのに使います。既存の scroll リスナー(`setScrollTop` の effect)に相乗りできるため、実装コストは小さいと見込みます。
 
 **影響範囲 / 互換**: 追加のみ。
+
+---
+
+## 9. pointerdown 時の `focus()` に `preventScroll: true` を付ける(2026-08-30 追記・v0.29.0 で確認)
+
+**背景**: comparison-grid のデモ(`maxHeight: 720` のグリッド 2 面 + 上部ツールバー)で、セルを **1 回クリックしただけ**で下方向に数行ぶん範囲選択される現象を確認しました(Playwright + Chrome で再現。viewport 900px でグリッド root の下端が 934px にある状態でクリックすると、ページが 33px スクロールし選択が 2 行に伸びる。ツールバーが高い実画面では 8〜9 行)。spreadsheet-grid 単体のデモではグリッドが viewport に収まるため表面化しません。
+
+**現状 / 原因**: `useGridPointerInteractions.ts` の `handleCellPointerDown`(約 505 行)/ `handleRowHeaderPointerDown`(約 672 行)/ 列ヘッダー pointerdown(約 750 行)が `gridRootRef.current?.focus()` を **`preventScroll` なし**で呼んでいます。グリッド root(`.ssg-shell`, `tabIndex=0`)が viewport に収まりきっていないと、`focus()` の既定動作でページ(祖先スクロールコンテナ)が root を見える位置までスクロールします。その結果、ポインタは動いていないのに**グリッドがポインタの下を流れ**、Chrome が新しくポインタ直下に来たセルへ boundary イベント(`pointerenter`)を発火 → `dragState` が `selection` のままなので `handleCellPointerEnter` が `updateSelection` を dispatch → `pointerup` までに選択が伸びる、という連鎖です。
+
+**検証**: document の capture 段階の `pointerdown` で `.ssg-shell` を `focus({ preventScroll: true })` しておく(グリッド側の `focus()` は既に activeElement なので no-op になる)と、同条件で **スクロール 0 / 選択 1 行** になりました。
+
+**提案**: pointerdown 系 3 箇所を `gridRootRef.current?.focus({ preventScroll: true })` にする。キーボード操作や `scrollToCell` 由来のフォーカスは対象外(スクロールしてよい)。`preventScroll` は全モダンブラウザ対応(jsdom も引数を無視するだけ)。
+
+**影響範囲 / 互換**: クリックでページがスクロールしなくなる以外の挙動変更なし。セル自体をビューポート内に持ってくる必要がある場合は既存の `scrollToCell` で明示的に行う想定。
+
+**採用時の comparison-grid 側の対応**: なし(peer 下限を修正版へ上げるのみ)。未採用の間の回避策として、`ComparisonPane` の `onPointerDownCapture` で同じ先行フォーカスを入れることができます(上記検証と同じ手法。内部クラス `.ssg-shell` に依存するため、採用後に外す前提)。
 
 ---
 
