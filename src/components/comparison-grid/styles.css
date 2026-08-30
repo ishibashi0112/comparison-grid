@@ -54,6 +54,15 @@
   min-height: 0;
 }
 
+/* 縦並び(layout='vertical')。1 カラムで left ペインが上、right ペインが下。
+   行は auto(各ペインが内容の高さ = グリッドの height / maxHeight で積まれる)。
+   ビューの高さを両ペインで等分したい場合は利用側で
+   `.cmpg-view--vertical { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }` を上書きし、
+   gridProps={{ height: '100%' }} を併用する。 */
+.cmpg-view--vertical {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .cmpg-pane {
   display: flex;
   flex-direction: column;

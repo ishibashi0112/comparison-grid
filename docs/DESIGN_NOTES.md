@@ -110,7 +110,12 @@
 - **展開ボタンはライブラリが描画しない。** 列は利用側のもの(サイドカー原則)なので、`getTreeInfo(row).hasChildren` / `isCollapsed(row)` / `matchKey` を使って利用側の列に組む(README レシピ / デモの Level 列)。デモでは Level 列を `createLevelColumn(アクセサ)` で組み立て、インデントも `getTreeInfo(row).depth` に切り替えた。「すべて展開」ボタンを追加。
 - 差分ジャンプは表示行が変わると現在位置がリセットされる既存挙動のまま(折りたたみで停止位置が変わるため妥当)。
 
-## 6. 環境メモ
+### 実装済み(2026-08-30・batch 17。縦並びレイアウト `layout='vertical'`)
+
+- **`ComparisonView` に `layout?: 'horizontal' | 'vertical'`(既定 `'horizontal'`)。** 列数が多く 2 カラムでは横に収まらない表向けに、ペインを上下に積む(left が上)。boolean(`enableVerticalLayout` 等)ではなく enum にしたのは、`enable*` は「機能の ON/OFF」の規約で、これは配置の選択(第 3 の配置が来ても壊れない)ため。API 上の名前は配置に依らず left / right のまま(データの意味は変わらないため。`.cmpg-view--horizontal` / `--vertical` と `data-cmpg-layout` を root に付与)。
+- **縦並びの行は auto(各ペインが内容の高さで積まれる)。** 横並びの `1fr 1fr` と対称に `grid-template-rows: 1fr 1fr` とはしなかった: グリッドの高さは props(`height` / `maxHeight`)で決まりコンテナに追従しないため、高さ未指定のビューで行を fr にすると短いペインが最長ペインまで引き伸ばされ空白が出る。ビューの高さを等分したい利用側は `.cmpg-view--vertical { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }` + `gridProps={{ height: '100%' }}` で上書きできる(API_REFERENCE に記載)。
+- **スクロール同期の軸はレイアウトに追従。** 横並びは従来どおり縦(top)のみ(列幅・横スクロールはペインごとに独立)。縦並びは縦横(top / left)両方 — 列が上下に揃うため横同期が「行が左右に揃うから縦同期」の対応物になり、縦同期も alignRows 併用時に両ペインが同じ行窓を映す用途で残す。軸選択の独立オプションは足さない(必要になったら `onScroll` / `ref` の透過で利用側実装が可能)。
+- デモ(App.tsx)に「縦並び」トグルを追加。
 
 - spreadsheet-grid: `~/dev/datasheet-grid`(GitHub `ishibashi0112/datasheet-grid`)。v0.29.0 = npm latest(2026-08-29・提案対応リリース「proposals batch 1〜6」)。ss2602 は `^0.16.0` 固定なので、ライブラリ導入時に 0.29 系へ上げる必要がある(0.17〜0.28 で export scope の改名や既定値変更あり)。
 - 引き継ぎ書と ss2602 の repomix は UTF-8 → Latin-1 の文字化け状態で受領したが内容は復元済み。Web 版へ持ち込む際は UTF-8 保存を確認。

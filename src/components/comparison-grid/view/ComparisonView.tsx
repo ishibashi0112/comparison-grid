@@ -1,8 +1,10 @@
-// 左右 2 ペイン + ペインごとのヘッダースロットを並べる薄いレイアウトです(CSS Grid 2 カラム)。
+// 2 ペイン + ペインごとのヘッダースロットを並べる薄いレイアウトです(CSS Grid)。
+//   layout='horizontal'(既定)は左右 2 カラム、'vertical' は上下 2 行(left が上)。
 //   ヘッダースロットは片側だけ指定されても両ペインに描画し、上端を揃えます。
 //   enableScrollSync では両グリッドのハンドルを内部 ref で捕まえ、source が 'user' の
-//   縦スクロールだけを相手の setScrollPosition({ top }) へ伝えます('api' 由来は無視して
-//   ループを防ぐ。spreadsheet-grid v0.29.0 のスクロール API)。
+//   スクロールだけを相手の setScrollPosition() へ伝えます('api' 由来は無視して
+//   ループを防ぐ。spreadsheet-grid v0.29.0 のスクロール API)。同期軸は layout に依り、
+//   横並びは top のみ、縦並びは top / left 両方(列が上下に揃うため横も合わせる)。
 import { useCallback, useMemo, useRef, type Ref, type RefCallback } from 'react';
 import type {
   GridScrollEventParams,
@@ -34,13 +36,15 @@ const setRefValue = <V,>(ref: Ref<V> | undefined, value: V | null): (() => void)
 };
 
 /** enableScrollSync の実装フックです。両グリッドのハンドルをこのフック内の ref に閉じ込め、
- *  source が 'user' の縦スクロールだけを相手の setScrollPosition({ top }) へ伝えます
+ *  source が 'user' のスクロールだけを相手の setScrollPosition() へ伝えます
  *  ('api' 由来は無視してループを防ぐ。spreadsheet-grid v0.29.0 のスクロール API)。
+ *  syncHorizontal(縦並びレイアウト)では top に加えて left も伝えます。
  *  ref の参照はすべて ref callback / イベントハンドラ内で行い、render 中には触りません。 */
 function useScrollSyncGridProps<T>(
   mergedLeft: ComparisonGridProps<T> | undefined,
   mergedRight: ComparisonGridProps<T> | undefined,
   enabled: boolean,
+  syncHorizontal: boolean,
 ): [ComparisonGridProps<T> | undefined, ComparisonGridProps<T> | undefined] {
   const leftHandleRef = useRef<SpreadsheetGridHandle<T> | null>(null);
   const rightHandleRef = useRef<SpreadsheetGridHandle<T> | null>(null);
@@ -77,20 +81,24 @@ function useScrollSyncGridProps<T>(
   const syncedLeftOnScroll = useCallback(
     (params: GridScrollEventParams) => {
       if (params.source === 'user') {
-        rightHandleRef.current?.setScrollPosition({ top: params.top });
+        rightHandleRef.current?.setScrollPosition(
+          syncHorizontal ? { top: params.top, left: params.left } : { top: params.top },
+        );
       }
       userLeftOnScroll?.(params);
     },
-    [userLeftOnScroll],
+    [userLeftOnScroll, syncHorizontal],
   );
   const syncedRightOnScroll = useCallback(
     (params: GridScrollEventParams) => {
       if (params.source === 'user') {
-        leftHandleRef.current?.setScrollPosition({ top: params.top });
+        leftHandleRef.current?.setScrollPosition(
+          syncHorizontal ? { top: params.top, left: params.left } : { top: params.top },
+        );
       }
       userRightOnScroll?.(params);
     },
-    [userRightOnScroll],
+    [userRightOnScroll, syncHorizontal],
   );
 
   const leftProps = useMemo(
@@ -122,6 +130,7 @@ export function ComparisonView<T extends object>(props: ComparisonViewProps<T>) 
     rightGridProps,
     className,
     style,
+    layout = 'horizontal',
     enableRowHighlight,
     enableKeyCellHighlight,
     enableFieldCellHighlight,
@@ -138,7 +147,12 @@ export function ComparisonView<T extends object>(props: ComparisonViewProps<T>) 
     () => mergeGridProps(gridProps, rightGridProps),
     [gridProps, rightGridProps],
   );
-  const [leftProps, rightProps] = useScrollSyncGridProps(mergedLeft, mergedRight, enableScrollSync);
+  const [leftProps, rightProps] = useScrollSyncGridProps(
+    mergedLeft,
+    mergedRight,
+    enableScrollSync,
+    layout === 'vertical',
+  );
   const highlight = {
     enableRowHighlight,
     enableKeyCellHighlight,
@@ -148,7 +162,11 @@ export function ComparisonView<T extends object>(props: ComparisonViewProps<T>) 
   };
 
   return (
-    <div className={cx('cmpg-view', className)} style={style}>
+    <div
+      className={cx('cmpg-view', `cmpg-view--${layout}`, className)}
+      style={style}
+      data-cmpg-layout={layout}
+    >
       <ComparisonPane<T>
         side="left"
         rows={comparison.visibleLeft}

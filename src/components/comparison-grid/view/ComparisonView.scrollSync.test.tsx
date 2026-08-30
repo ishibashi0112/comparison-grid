@@ -127,6 +127,20 @@ describe('ComparisonView enableScrollSync', () => {
     expect(leftEl.scrollTop).toBe(480);
   });
 
+  it("layout='vertical'(縦並び)では縦横とも同期される", async () => {
+    const { container } = render(<Harness alignRows enableScrollSync layout="vertical" />);
+    const leftEl = scrollElOf(container, 'left');
+    const rightEl = scrollElOf(container, 'right');
+
+    await userScroll(leftEl, { top: 240, left: 120 });
+    expect(rightEl.scrollTop).toBe(240);
+    expect(rightEl.scrollLeft).toBe(120);
+
+    // 双方向: 下(right)の横スクロールも上(left)へ伝わる。
+    await userScroll(rightEl, { left: 300 });
+    expect(leftEl.scrollLeft).toBe(300);
+  });
+
   it("同期由来(source 'api')のスクロールは相手へ戻さず、利用側 onScroll へは透過する", async () => {
     const events: { side: string; params: GridScrollEventParams }[] = [];
     const { container } = render(

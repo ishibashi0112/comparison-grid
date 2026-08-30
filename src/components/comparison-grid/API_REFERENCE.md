@@ -314,13 +314,14 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 
 ### `ComparisonView<T extends object>`
 
-左右 2 ペイン + ヘッダースロットの CSS Grid 2 カラムレイアウトです。
+2 ペイン + ヘッダースロットの CSS Grid レイアウトです。既定は左右 2 カラム(横並び)で、`layout='vertical'` で上下 2 行(縦並び)になります。
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `comparison` | `ComparisonViewModel<T>` | (required) | `useComparison` / `useTreeComparison` の戻り値をそのまま渡す(`visibleLeft` / `visibleRight` / `leftDiffs` / `rightDiffs` / `compareFields`、alignRows 利用時は `placeholders`、木モードでは `contextRows` / `descendantDiffCounts` も使用)。 |
 | `columns` | `readonly GridColumn<T>[]` | (required) | 利用側の列定義(両ペイン共通)。参照安定化(浅い構造比較)される。 |
 | `keyColumnKeys` | `readonly string[]` | — | 突き合わせキー相当の列キー。`left-only` / `right-only` 行でその列のセルを強調。 |
+| `layout` | `ComparisonViewLayout`(`'horizontal' \| 'vertical'`) | `'horizontal'` | ペイン配置。`'vertical'` で上下 2 ペイン(left が上、right が下)になる。API 上の名前は配置に依らず left / right のまま。縦並びの行は auto(各ペインが内容の高さ = グリッドの `height` / `maxHeight` で積まれる)。ビューの高さを両ペインで等分したいときは利用側 CSS で `.cmpg-view--vertical { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }` を上書きし、`gridProps={{ height: '100%' }}` を併用する。 |
 | `leftHeader` / `rightHeader` | `ReactNode` | — | ペイン上部のスロット。片側だけ指定しても両ペインに(空の)スロットを描画して上端を揃える。 |
 | `gridProps` | `ComparisonGridProps<T>` | — | 両ペイン共通の `SpreadsheetGrid` props(下記「gridProps の透過」)。 |
 | `leftGridProps` / `rightGridProps` | `ComparisonGridProps<T>` | — | 片側だけの上書き(`gridProps` の上に浅くマージ)。`ref` を片側ずつ渡す用途など。 |
@@ -329,7 +330,7 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 | `enableRowHighlight` | `boolean` | `true` | `same` 以外の行へ `.cmpg-row-diff` を付与。 |
 | `enableKeyCellHighlight` | `boolean` | `true` | `keyColumnKeys` 列のセル強調。 |
 | `enableFieldCellHighlight` | `boolean` | `true` | `compareFields` 対応列のセル強調。 |
-| `enableScrollSync` | `boolean` | `false` | 左右ペインの**縦**スクロールを同期する(`alignRows` との併用を想定。横は同期しない)。`source: 'user'` のスクロールだけ相手の `setScrollPosition({ top })` へ伝え、`'api'` 由来は無視してループを防ぐ(spreadsheet-grid v0.29.0 のスクロール API)。利用側の `ref` / `onScroll`(`gridProps` / 片側 props)はそのまま透過・合成される。 |
+| `enableScrollSync` | `boolean` | `false` | 両ペインのスクロールを同期する(`alignRows` との併用を想定)。同期する軸は `layout` に依る: `'horizontal'` は**縦**(top)のみ(横は同期しない)、`'vertical'` は**縦横**(top / left)両方(縦並びでは列が上下に揃うため横も合わせる)。`source: 'user'` のスクロールだけ相手の `setScrollPosition()` へ伝え、`'api'` 由来は無視してループを防ぐ(spreadsheet-grid v0.29.0 のスクロール API)。利用側の `ref` / `onScroll`(`gridProps` / 片側 props)はそのまま透過・合成される。 |
 | `className` / `style` | `string` / `CSSProperties` | — | ルート(`.cmpg-view`)へ。 |
 
 ### `ComparisonPane<T extends object>`
@@ -378,7 +379,7 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 
 | クラス | 付与先 | 意味 |
 | --- | --- | --- |
-| `.cmpg-view` | ルート | 2 カラムの CSS Grid。 |
+| `.cmpg-view` / `.cmpg-view--horizontal` / `.cmpg-view--vertical` | ルート | CSS Grid(横並び = 2 カラム / 縦並び = 1 カラム)。`layout` に応じた修飾子と `data-cmpg-layout` 属性が付く。 |
 | `.cmpg-pane` / `.cmpg-pane--left` / `.cmpg-pane--right` | ペイン | 縦 flex。`data-cmpg-side` 属性も付く。 |
 | `.cmpg-pane-header` / `.cmpg-pane-body` | ペイン内 | ヘッダースロット / グリッド領域。 |
 | `.cmpg-grid` | グリッド root(`.ssg-root`) | 利用側 `className` と合成。 |

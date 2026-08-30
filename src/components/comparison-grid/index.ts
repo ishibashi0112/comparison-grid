@@ -81,5 +81,6 @@ export type {
   ComparisonDiffLabelColumnProps,
   ComparisonPaneProps,
   ComparisonViewModel,
+  ComparisonViewLayout,
   ComparisonViewProps,
 } from './model/types';

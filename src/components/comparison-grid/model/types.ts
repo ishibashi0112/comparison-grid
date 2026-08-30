@@ -356,13 +356,21 @@ export type ComparisonViewModel<T> = Pick<
   Partial<Pick<UseComparisonResult<T>, 'placeholders'>> &
   Partial<Pick<UseTreeComparisonResult<T>, 'contextRows' | 'descendantDiffCounts'>>;
 
+/** ComparisonView のペイン配置。'horizontal' = 左右 2 ペイン(既定)/ 'vertical' = 上下 2 ペイン
+ *  (left が上、right が下。API 上の名前は配置に依らず left / right のまま)。 */
+export type ComparisonViewLayout = 'horizontal' | 'vertical';
+
 export type ComparisonViewProps<T extends object> = ComparisonHighlightOptions &
   ComparisonDiffLabelColumnProps<T> & {
     comparison: ComparisonViewModel<T>;
     columns: readonly GridColumn<T>[];
     keyColumnKeys?: readonly string[];
-    /** 左右ペインの縦スクロールを同期する(既定 false)。alignRows との併用を想定。
-     *  source が 'user' のスクロールだけを相手ペインへ伝え、'api' 由来は無視してループを防ぎます。 */
+    /** ペイン配置(既定 'horizontal')。'vertical' で上下 2 ペイン(left が上)になる。 */
+    layout?: ComparisonViewLayout;
+    /** 両ペインのスクロールを同期する(既定 false)。alignRows との併用を想定。
+     *  同期する軸は layout に依る: 'horizontal' は縦(top)のみ、'vertical' は縦横(top / left)両方
+     *  (縦並びでは列が上下に揃うため横も合わせる)。source が 'user' のスクロールだけを相手ペインへ
+     *  伝え、'api' 由来は無視してループを防ぎます。 */
     enableScrollSync?: boolean;
     leftHeader?: ReactNode;
     rightHeader?: ReactNode;

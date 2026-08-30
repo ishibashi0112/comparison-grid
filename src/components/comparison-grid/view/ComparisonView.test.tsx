@@ -81,6 +81,24 @@ describe('ComparisonView', () => {
     expect(container.querySelectorAll('.cmpg-pane-header')).toHaveLength(0);
   });
 
+  it('既定は横並び(.cmpg-view--horizontal / data-cmpg-layout)', () => {
+    const { container } = render(<Harness />);
+    const view = container.querySelector('.cmpg-view');
+    expect(view?.classList.contains('cmpg-view--horizontal')).toBe(true);
+    expect(view?.classList.contains('cmpg-view--vertical')).toBe(false);
+    expect(view?.getAttribute('data-cmpg-layout')).toBe('horizontal');
+  });
+
+  it("layout='vertical' で縦並びクラスが付き、left ペインが先(上)に来る", () => {
+    const { container } = render(<Harness layout="vertical" className="my-view" />);
+    const view = container.querySelector('.cmpg-view');
+    expect(view?.classList.contains('cmpg-view--vertical')).toBe(true);
+    expect(view?.classList.contains('my-view')).toBe(true);
+    expect(view?.getAttribute('data-cmpg-layout')).toBe('vertical');
+    const panes = Array.from(container.querySelectorAll('.cmpg-pane'));
+    expect(panes.map((el) => el.getAttribute('data-cmpg-side'))).toEqual(['left', 'right']);
+  });
+
   it('差分行 / キー列セル / 差分フィールドセルに既定クラスが付き、差分ラベル列が出る', () => {
     const { container } = render(
       <Harness keyColumnKeys={['id']} showDiffLabelColumn diffLabelColumn={{ title: '変更箇所' }} />,

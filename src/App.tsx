@@ -144,6 +144,7 @@ export default function App() {
   const [isReprItemMode, setIsReprItemMode] = useState(false);
   const [alignRows, setAlignRows] = useState(false);
   const [syncScroll, setSyncScroll] = useState(false);
+  const [verticalLayout, setVerticalLayout] = useState(false);
   // 折りたたみ: 突き合わせキー(matchKey)の集合を利用側の state で持つ。
   const [collapsedKeys, setCollapsedKeys] = useState<ReadonlySet<string>>(() => new Set());
   const toggleCollapsed = useCallback((key: string) => {
@@ -337,6 +338,14 @@ export default function App() {
           <label className="demo-toggle">
             <input
               type="checkbox"
+              checked={verticalLayout}
+              onChange={(event) => setVerticalLayout(event.target.checked)}
+            />
+            縦並び
+          </label>
+          <label className="demo-toggle">
+            <input
+              type="checkbox"
               checked={enableGridFeatures}
               onChange={(event) => setEnableGridFeatures(event.target.checked)}
             />
@@ -412,6 +421,7 @@ export default function App() {
           keyColumnKeys={['itemCode']}
           showDiffLabelColumn
           diffLabelColumn={{ title: '変更箇所', width: 130 }}
+          layout={verticalLayout ? 'vertical' : 'horizontal'}
           enableScrollSync={syncScroll}
           leftHeader={<PaneHeader info={toRootItemInfo(leftRows)} />}
           rightHeader={<PaneHeader info={toRootItemInfo(rightRows)} />}
