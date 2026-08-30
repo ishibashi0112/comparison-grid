@@ -37,6 +37,8 @@ const getRepresentativeCode = (row: BomRow) => row.reprItemCode;
 
 // Level 列: 階層の深さ(getTreeInfo の depth)に応じて左インデントを付け、子を持つ行には折りたたみの
 //   展開ボタンを出す。ボタンは行の matchKey(左右共通)でトグルするため、片側を畳めば相手側の対も畳まれる。
+//   当たり判定: ボタン(20px 角)に加え、子を持つ行ではセル全体のクリックでもトグルする(ボタンは
+//   キーボード操作用に残し、クリックの二重発火は stopPropagation で防ぐ)。
 //   左右整列(alignRows)のプレースホルダ行は階層情報を持たない(getTreeInfo が undefined)ので空表示に落とす。
 type TreeAccessors = {
   getTreeInfo: (row: BomRow) => ComparisonTreeInfo<BomRow> | undefined;
@@ -56,15 +58,23 @@ const createLevelColumn = ({
     const info = getTreeInfo(row);
     if (!info) return null;
     const collapsed = isCollapsed(row);
+    const toggle = info.hasChildren ? () => toggleCollapsed(info.matchKey) : undefined;
     return (
-      <div className="demo-level-cell" style={{ paddingLeft: `${info.depth * 12}px` }}>
-        {info.hasChildren ? (
+      <div
+        className={toggle ? 'demo-level-cell demo-level-cell--toggle' : 'demo-level-cell'}
+        style={{ paddingLeft: `${info.depth * 12}px` }}
+        onClick={toggle}
+      >
+        {toggle ? (
           <button
             type="button"
             className="demo-expander"
             aria-label={collapsed ? '展開' : '折りたたむ'}
             aria-expanded={!collapsed}
-            onClick={() => toggleCollapsed(info.matchKey)}
+            onClick={(event) => {
+              event.stopPropagation();
+              toggle();
+            }}
           >
             {collapsed ? '▸' : '▾'}
           </button>

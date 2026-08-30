@@ -135,23 +135,54 @@
   box-sizing: border-box;
 }
 
+/* 子を持つ行の Level セルはセル全体がトグルの当たり判定。 */
+.demo-level-cell--toggle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.demo-level-cell--toggle:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.demo-app--dark .demo-level-cell--toggle:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* 展開ボタン: 20px 角の当たり判定(見た目の矢印は小さいまま)。 */
 .demo-expander {
   flex: 0 0 auto;
-  width: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
   margin-right: 2px;
   padding: 0;
   border: 0;
+  border-radius: 3px;
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1;
   cursor: pointer;
 }
 
+.demo-expander:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.demo-app--dark .demo-expander:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .demo-expander--leaf {
-  display: inline-block;
   cursor: default;
+}
+
+.demo-expander--leaf:hover {
+  background: transparent;
 }
 
 .demo-detail-button {
