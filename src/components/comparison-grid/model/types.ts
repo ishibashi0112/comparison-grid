@@ -362,3 +362,84 @@ export type ComparisonViewProps<T extends object> = ComparisonHighlightOptions &
     className?: string;
     style?: CSSProperties;
   };
+
+// ---------------------------------------------------------------------------------------------
+// 階層比較(木)。平坦なコア(compare / alignComparisonRows)の上に載る入力層で、木から突き合わせキー
+//   (パス)と階層情報をサイドカーで導出します。T に children を要求せず、ノードが T を包みます。
+// ---------------------------------------------------------------------------------------------
+
+/** 階層比較の入力ノード。`row` は利用側の行そのもの(書き込まない)。 */
+export type ComparisonTreeNode<T> = {
+  row: T;
+  children?: readonly ComparisonTreeNode<T>[];
+};
+
+/** 展開結果(深さ優先順 + level)から木を組む。level は 0 始まりでも 1 始まりでもよい(先頭行を基準の相対値で扱う)。 */
+export type BuildComparisonTreeByLevelOptions<T> = {
+  getLevel: (row: T) => number;
+};
+
+/** 隣接リスト(各行が親を指す)から木を組む。`getId` は**出現ごとに一意な行 ID**(品番は不可)。 */
+export type BuildComparisonTreeByParentOptions<T> = {
+  getId: (row: T) => string;
+  /** 親の行 ID。null / undefined / '' はルート行。 */
+  getParentId: (row: T) => string | null | undefined;
+};
+
+export type BuildComparisonTreeOptions<T> =
+  | BuildComparisonTreeByLevelOptions<T>
+  | BuildComparisonTreeByParentOptions<T>;
+
+/** buildComparisonTree が検出する破綻の種類(修復せず報告する)。 */
+export type ComparisonTreeIssueKind =
+  /** level が直前の行より 2 段以上深い(直前の行の子として扱う)。 */
+  | 'level-jump'
+  /** 同じ ID の行が複数ある(親の参照は最初の行へ解決)。品番を ID に渡した典型。 */
+  | 'duplicate-id'
+  /** 親 ID の行が見つからない(ルート行として扱う)。 */
+  | 'missing-parent'
+  /** 親の参照が循環している(その行をルート行として扱う)。 */
+  | 'cycle';
+
+export type ComparisonTreeIssue<T> = {
+  kind: ComparisonTreeIssueKind;
+  row: T;
+  /** 入力配列上の行位置。 */
+  rowIndex: number;
+  /** 日本語のメッセージ(UI 表示 / ログ用)。 */
+  message: string;
+};
+
+export type BuildComparisonTreeResult<T> = {
+  roots: ComparisonTreeNode<T>[];
+  issues: ComparisonTreeIssue<T>[];
+};
+
+/** 木から突き合わせキー(パス)を導出する設定。 */
+export type ComparisonTreeKeyOptions<T> = {
+  /** 自ノードのコード(パスの 1 セグメント)。木の中で何度現れてもよい。 */
+  getCode: (row: T) => string;
+  /** 代表コード。空でない値を返すと自セグメントを置き換え、子孫のキーにも伝播する。 */
+  getRepresentativeCode?: (row: T) => string | null | undefined;
+  /** セグメントの区切り(既定 '/')。 */
+  separator?: string;
+};
+
+/** 行ごとの階層情報(flattenComparisonTree のサイドカー)。 */
+export type ComparisonTreeInfo<T> = {
+  /** 0 始まりの深さ。 */
+  depth: number;
+  /** 親の行(ルートは undefined)。 */
+  parent?: T;
+  hasChildren: boolean;
+  /** 同じ親の下で同じセグメントを持つ行のうち何番目か(0 始まり)。1 以上ならキーに '#n' が付く。 */
+  occurrence: number;
+  /** 突き合わせキー(パス)。 */
+  matchKey: string;
+};
+
+export type FlattenComparisonTreeResult<T> = {
+  /** 深さ優先順の行。 */
+  rows: T[];
+  infos: ReadonlyMap<T, ComparisonTreeInfo<T>>;
+};

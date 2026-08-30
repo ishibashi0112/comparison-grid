@@ -4,7 +4,7 @@
 > `view/*.tsx`)から手で起こした公開 API のスナップショットです。**型を変更したら本ファイルも同期してください。**
 > spreadsheet-grid 側の props / 型は [spreadsheet-grid の API_REFERENCE](https://github.com/ishibashi0112/datasheet-grid/blob/main/src/components/spreadsheet-grid/API_REFERENCE.md) を参照。
 
-最終更新: 初版(0.1.0)。
+最終更新: 2026-08-30(batch 15a: 階層比較の純ロジックを追加)。
 
 ## 設計の要点
 
@@ -108,6 +108,78 @@ type ComparisonLabels = {
 | `diffLabelColumn` | `DiffLabelColumnOptions<T>` | — | ラベル列の調整(`key` / `title` / `position` を使用)。 |
 
 セルの規則: `value` は `getValue ?? row[key]`、`text` は本体の**セル表示**と同じく `value == null` なら `''`(`valueFormatter` を通さない)、それ以外は `valueFormatter({ value, row, column }) ?? String(value)`。列見出しは `title ?? key`。プレースホルダ行(alignRows)は全セル空になります。
+
+## 階層比較(木)
+
+平坦なコア(`compare` / `alignComparisonRows`)の上に載る**入力層**です。部品表のように親子関係を持つデータで品番だけをキーにすると「別の親の下の同じ品番」が突き合ってしまうため、木から**パス**(`B2002/C3001`)を突き合わせキーとして導出します。ノードは `T` を包むだけで、`T` に `children` を要求しません(サイドカー原則)。
+
+### `ComparisonTreeNode<T>`
+
+`{ row: T; children?: readonly ComparisonTreeNode<T>[] }`。入れ子 JSON をそのまま使う場合は利用側で `{ row, children: row.children.map(...) }` に包みます(平坦な行からは下記 `buildComparisonTree`)。
+
+### `buildComparisonTree<T>(rows, options): BuildComparisonTreeResult<T>`
+
+平坦な行から木を組み立てます(純関数)。入力形は 2 つ:
+
+| `options` | 用途 | 説明 |
+| --- | --- | --- |
+| `{ getLevel: (row) => number }` | 展開結果(深さ優先順 + level) | BOM 展開 API の典型。**ID 不要**。level は先頭行を 0 とした相対値で扱う(0 始まりでも 1 始まりでも可)。「行の親 = 直前の 1 段浅い行」。 |
+| `{ getId, getParentId }` | 隣接リスト(各行が親を指す) | `getId` は**出現ごとに一意な行 ID**(構成テーブルの PK / 展開時の連番)。`getParentId` が `null` / `undefined` / `''` ならルート。兄弟順・ルート順は入力順。 |
+
+戻り値 `{ roots: ComparisonTreeNode<T>[]; issues: ComparisonTreeIssue<T>[] }`。**破綻は修復せず、ベストエフォートの木と `issues` で報告**します(投げません)。
+
+| `issue.kind` | 条件 | ベストエフォートの扱い |
+| --- | --- | --- |
+| `level-jump` | level が直前の行より 2 段以上深い | 直前の行の子として扱う |
+| `duplicate-id` | 同じ ID の行が複数ある | 親の参照は最初の行へ解決。**品番を ID に渡した典型** |
+| `missing-parent` | 親 ID の行が見つからない | ルート行として扱う |
+| `cycle` | 親の参照が循環している | その行をルート行として扱う |
+
+`ComparisonTreeIssue<T>` = `{ kind, row, rowIndex, message }`(`message` は日本語。UI に出すか処理を止めるかは利用側の判断)。
+
+**落とし穴 — 識別 ID と突き合わせコードは別**: 同じサブ ASSY が複数箇所で使われる構成は正常ですが、展開結果の親参照に**品番**を使うと「どの出現の子か」を区別できません(`duplicate-id` として検出されます)。展開 API が level 付きで返すなら `getLevel` が最も簡単で、行 ID は不要です。なお、品目間の構成マスタ(親品番・子品番・員数)から出現ごとの行へ**展開**する処理(DAG → 木)はライブラリの範囲外です。渡すのは「展開済みの、出現 1 回 = 1 行」のデータです。
+
+### `flattenComparisonTree<T>(roots, options): FlattenComparisonTreeResult<T>`
+
+木を深さ優先順に平坦化し、行ごとの突き合わせキーと階層情報をサイドカーで返します(純関数)。
+
+| `options` | 型 | 既定 | 説明 |
+| --- | --- | --- | --- |
+| `getCode` | `(row: T) => string` | (required) | 自ノードのコード(パスの 1 セグメント)。木の中で何度現れてもよい。 |
+| `getRepresentativeCode` | `(row: T) => string \| null \| undefined` | — | 代表コード。空でない値を返すと自セグメントを置き換え、**子孫のキーへ伝播**する(親が後継品番に変わっても子が突き合う)。 |
+| `separator` | `string` | `'/'`(`DEFAULT_TREE_KEY_SEPARATOR`) | セグメントの区切り。 |
+
+戻り値:
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `rows` | `T[]` | 深さ優先順の行(グリッド / `compare()` へそのまま渡す)。 |
+| `infos` | `ReadonlyMap<T, ComparisonTreeInfo<T>>` | 行 → `{ depth, parent, hasChildren, occurrence, matchKey }`。`depth` は 0 始まり、`parent` はルートで `undefined`。 |
+
+キーの規則: `親のキー + separator + セグメント`。同じ親の下でセグメントが重複したときは出現順に `#n` を付けます(`B2002/C3003`, `B2002/C3003#1`。区切りは `TREE_KEY_OCCURRENCE_SEPARATOR`)。取付位置・工程などで区別できる列があるなら、それを `getCode` に含めるほうが確実です。
+
+headless での組み合わせ:
+
+```ts
+const flatLeft = flattenComparisonTree(leftTree.roots, { getCode });
+const flatRight = flattenComparisonTree(rightTree.roots, { getCode });
+const result = compare(flatLeft.rows, flatRight.rows, {
+  getMatchKey: (row) => flatLeft.infos.get(row)?.matchKey ?? flatRight.infos.get(row)?.matchKey ?? '',
+  compareFields,
+});
+```
+
+### `alignComparisonTree<T>(left, right, leftDiffs, options?): AlignComparisonRowsResult<T>`
+
+木モードの左右整列(**構造マージ**)。戻り値の形は `alignComparisonRows` と同じ(`pairs` / `placeholders`)ですが、並びの規則が違います。
+
+| 引数 | 型 | 説明 |
+| --- | --- | --- |
+| `left` / `right` | `readonly ComparisonTreeNode<T>[]` | 左右の木。 |
+| `leftDiffs` | `ComparisonDiffMap<T>` | `compare()` の `leftDiffs`(`counterpart` を使う)。 |
+| `options.createPlaceholderRow` | `(side) => T` | `alignComparisonRows` と同じ。 |
+
+規則: 兄弟リスト単位で左の順に対を作り(相手は**同じ兄弟リストに居る** counterpart だけ。別の場所に居る相手は片側のみ扱い)、右にしか無いサブツリーは**直前に対になった兄弟の直後**に挿入します(先行する対が無ければ最初の対の直前、対が 1 つも無ければ末尾)。片側のみのサブツリーは丸ごと相手側プレースホルダと組みます。ASSY 内に追加された部品がその ASSY の直下に並び、左右の親子関係が崩れません。
 
 ## React 層
 

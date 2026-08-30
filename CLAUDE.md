@@ -46,6 +46,8 @@ src/components/comparison-grid/
   logic/alignRows.ts    純ロジック: 左右整列(プレースホルダ行の挿入)
   logic/paneColumns.ts  純ロジック: 列定義 / 行クラスの合成、差分ラベル列
   logic/exportData.ts   純ロジック: エクスポートデータ生成(getExportData() と同形)
+  logic/tree.ts         純ロジック: 階層比較(平坦な行 → 木 / 木 → パスキー付き平坦化・issues 報告)
+  logic/alignTree.ts    純ロジック: 木モードの左右整列(構造マージ)
   logic/cx.ts           className 連結
   hooks/useStableValue.ts 参照安定化(浅い構造比較)
   hooks/useComparison.ts  compare() の React 接続、alignRows / 差分のみフィルタの導出

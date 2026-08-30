@@ -8,6 +8,14 @@ export {
 } from './logic/compare';
 export { alignComparisonRows } from './logic/alignRows';
 export { getComparisonExportData } from './logic/exportData';
+// 階層比較(木): 平坦な行 → 木 / 木 → キー付き平坦化 / 構造マージ整列。
+export {
+  buildComparisonTree,
+  flattenComparisonTree,
+  DEFAULT_TREE_KEY_SEPARATOR,
+  TREE_KEY_OCCURRENCE_SEPARATOR,
+} from './logic/tree';
+export { alignComparisonTree } from './logic/alignTree';
 // ライブラリが付与するクラス名と差分ラベル列の既定キー(利用側 CSS / テスト向け)。
 export { CMPG_CLASS_NAMES, DEFAULT_DIFF_LABEL_COLUMN_KEY } from './logic/paneColumns';
 // React 層。
@@ -37,6 +45,16 @@ export type {
   AlignComparisonRowsOptions,
   AlignComparisonRowsResult,
   ComparisonExportOptions,
+  ComparisonTreeNode,
+  BuildComparisonTreeByLevelOptions,
+  BuildComparisonTreeByParentOptions,
+  BuildComparisonTreeOptions,
+  ComparisonTreeIssueKind,
+  ComparisonTreeIssue,
+  BuildComparisonTreeResult,
+  ComparisonTreeKeyOptions,
+  ComparisonTreeInfo,
+  FlattenComparisonTreeResult,
   UseComparisonOptions,
   UseComparisonResult,
   ComparisonDiffStop,

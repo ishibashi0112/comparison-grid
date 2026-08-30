@@ -180,6 +180,32 @@ useComparison({ ..., getMatchKey: useRepresentative ? byRepresentative : byPath 
 
 Define the functions outside the component (or memoize them) — a new function identity re-runs the comparison.
 
+### Hierarchical data (BOM trees): match by path, not by code
+
+Matching by part number alone pairs "the same child under a *different* parent". Build a tree and let the library derive **path keys** (`B2002/C3001`); representative-code substitution then propagates to descendants automatically.
+
+```ts
+import { buildComparisonTree, flattenComparisonTree, compare, alignComparisonTree } from '@ishibashi0112/comparison-grid';
+
+// Expansion output (depth-first order + level) — no ids needed:
+const leftTree = buildComparisonTree(leftRows, { getLevel: (r) => r.levelNo });
+// Adjacency list — ids must be unique per occurrence (never the part number):
+// const leftTree = buildComparisonTree(leftRows, { getId: (r) => r.rowId, getParentId: (r) => r.parentRowId });
+leftTree.issues; // level-jump / duplicate-id / missing-parent / cycle — reported, never repaired
+
+const keyOptions = { getCode: (r: BomRow) => r.itemCode, getRepresentativeCode: (r: BomRow) => r.reprItemCode };
+const flatLeft = flattenComparisonTree(leftTree.roots, keyOptions);
+const flatRight = flattenComparisonTree(rightTree.roots, keyOptions);
+const result = compare(flatLeft.rows, flatRight.rows, {
+  getMatchKey: (r) => flatLeft.infos.get(r)?.matchKey ?? flatRight.infos.get(r)?.matchKey ?? '',
+  compareFields,
+});
+// Structural alignment: right-only subtrees land next to their siblings, not at the end.
+const aligned = alignComparisonTree(leftTree.roots, rightTree.roots, result.leftDiffs);
+```
+
+Siblings with the same code under one parent get an occurrence suffix (`#1`, `#2`) instead of colliding; include a position/process field in `getCode` when you have one. Expanding an item-level BOM master (parent/child edges) into per-occurrence rows is outside the library — pass the expanded rows.
+
 ### Compare numbers stored as strings
 
 ```ts
@@ -408,6 +434,32 @@ useComparison({ ..., getMatchKey: useRepresentative ? byRepresentative : byPath 
 ```
 
 関数はコンポーネント外で定義する(またはメモ化する)こと — 関数の同一性が変わると比較が再実行されます。
+
+#### 階層データ(部品表の木)はコードでなくパスで突き合わせる
+
+品番だけで突き合わせると「*別の親*の下の同じ品番」同士が対になってしまいます。木を組み立て、ライブラリに**パスキー**(`B2002/C3001`)を導出させてください。代表コードの置き換えは子孫へ自動で伝播します。
+
+```ts
+import { buildComparisonTree, flattenComparisonTree, compare, alignComparisonTree } from '@ishibashi0112/comparison-grid';
+
+// 展開結果(深さ優先順 + level)から — ID 不要:
+const leftTree = buildComparisonTree(leftRows, { getLevel: (r) => r.levelNo });
+// 隣接リストから — ID は出現ごとに一意な行 ID(品番は不可):
+// const leftTree = buildComparisonTree(leftRows, { getId: (r) => r.rowId, getParentId: (r) => r.parentRowId });
+leftTree.issues; // level-jump / duplicate-id / missing-parent / cycle — 修復せず報告
+
+const keyOptions = { getCode: (r: BomRow) => r.itemCode, getRepresentativeCode: (r: BomRow) => r.reprItemCode };
+const flatLeft = flattenComparisonTree(leftTree.roots, keyOptions);
+const flatRight = flattenComparisonTree(rightTree.roots, keyOptions);
+const result = compare(flatLeft.rows, flatRight.rows, {
+  getMatchKey: (r) => flatLeft.infos.get(r)?.matchKey ?? flatRight.infos.get(r)?.matchKey ?? '',
+  compareFields,
+});
+// 構造整列: 右にしか無いサブツリーは末尾でなく兄弟の位置に入る。
+const aligned = alignComparisonTree(leftTree.roots, rightTree.roots, result.leftDiffs);
+```
+
+同じ親の下に同じコードの兄弟が複数ある場合は衝突させず出現番号(`#1`, `#2`)を付けます。取付位置・工程の列があるなら `getCode` に含めてください。品目間の構成マスタ(親品番・子品番)から出現ごとの行へ**展開**する処理はライブラリの範囲外です(展開済みの行を渡します)。
 
 #### 文字列で持っている数値を比較する
 
