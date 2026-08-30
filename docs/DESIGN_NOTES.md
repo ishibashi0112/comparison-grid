@@ -45,7 +45,7 @@
 6. **状態クラスの公開契約化。** `.ssg-body-cell--row-hovered` / `--readonly` / `--invalid` などをホバー色の連結に使っている。API_REFERENCE に「スタイル用の状態クラス一覧」として載せておくと、利用側が安心して連結できる。
 7. **`title: ''` の列ヘッダーが `key` にフォールバックする。** ボタン専用列(ss2602 の `__detail`)で空タイトルにすると `__detail` が見出しに出る。空文字は「見出しなし」として扱うか、API_REFERENCE に明記すると親切(デモでは `title: 'マスタ'` で回避)。
 8. **スクロール同期 API(Phase 2 向け)。** 左右整列モードでは 2 グリッドの縦スクロールを同期したい。ハンドルに `getScrollPosition()` / `setScrollPosition({ top, left })`、props に `onScroll` があると実装できる(現状は `scrollToRow` / `scrollToCell` のみ)。
-9. **pointerdown 時の `focus()` に `preventScroll: true`(2026-08-30・v0.29.0 で確認)。** グリッド root(`.ssg-shell`)が viewport に収まりきっていない状態でセルを 1 回クリックすると、`focus()` の既定動作でページがスクロールし、ポインタ直下に来たセルへの `pointerenter` が `selection` ドラッグ中の `updateSelection` を呼んで**単クリックが数行の範囲選択になる**(Playwright + Chrome で再現: viewport 900px / root 下端 934px → スクロール 33px・選択 2 行)。`useGridPointerInteractions.ts` の pointerdown 3 箇所を `focus({ preventScroll: true })` にすれば解消(capture 段階の先行フォーカスで検証済み)。詳細は `docs/SPREADSHEET_GRID_PROPOSALS.md` #9。未採用の間は `ComparisonPane` 側の `onPointerDownCapture` で回避可能(内部クラス依存のため採用後に外す前提)。
+9. **pointerdown 時の `focus()` に `preventScroll: true`(2026-08-30・v0.29.0 で確認)。** グリッド root(`.ssg-shell`)が viewport に収まりきっていない状態でセルを 1 回クリックすると、`focus()` の既定動作でページがスクロールし、ポインタ直下に来たセルへの `pointerenter` が `selection` ドラッグ中の `updateSelection` を呼んで**単クリックが数行の範囲選択になる**(Playwright + Chrome で再現: viewport 900px / root 下端 934px → スクロール 33px・選択 2 行)。`useGridPointerInteractions.ts` の pointerdown 3 箇所を `focus({ preventScroll: true })` にすれば解消(capture 段階の先行フォーカスで検証済み)。詳細は `docs/SPREADSHEET_GRID_PROPOSALS.md` #9。**v0.29.1(2026-08-30)で採用済み**: peer 範囲を `>=0.29.1 <1.0.0` へ更新し、実ブラウザで解消を確認(暫定回避は入れていない)。
 
 ## 5. Phase 2 候補と実装記録
 

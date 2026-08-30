@@ -6,7 +6,7 @@
 
 - React 19 / TypeScript 6 / Vite 8。ツールチェーンは vite+(`vp` コマンド)。pnpm 11.12.0(`packageManager` で固定)。
 - Vitest 4(`pnpm-workspace.yaml` の overrides で vp 同梱バージョンへ pin)。jsdom は `.test.tsx` のみ(先頭 docblock `// @vitest-environment jsdom`)。
-- peer: `react` / `react-dom` `^19`、`@ishibashi0112/spreadsheet-grid` `>=0.29.0 <1.0.0`(0.x で minor が頻繁に上がるため `^` を使わない)。
+- peer: `react` / `react-dom` `^19`、`@ishibashi0112/spreadsheet-grid` `>=0.29.1 <1.0.0`(0.x で minor が頻繁に上がるため `^` を使わない。0.29.1 = pointerdown の `focus({ preventScroll })` 修正)。
 - 構成は spreadsheet-grid リポジトリ(`~/dev/datasheet-grid`)を踏襲: ライブラリ本体は `src/components/comparison-grid/`、ルートは playground デモ(`src/App.tsx`)、配布物は `vite.lib.config.ts` + `tsconfig.lib.json` で `dist/` に生成。
 
 ## 厳守事項

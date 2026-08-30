@@ -33,8 +33,11 @@ spreadsheet-grid **v0.29.0**(コミット「proposals batch 1〜6」・2026-08-2
 | 6 | ✅ 採用(batch 4) | API_REFERENCE / website に「スタイリング用の状態クラス(公開契約)」節(変更時 breaking 扱い) |
 | 7 | ✅ (b) 採用(batch 4) | 挙動は現状維持のうえ、`title` 未指定 / 空文字時の `key` フォールバックを API_REFERENCE に明記((a) の `title ?? key` 化は別途検討) |
 | 8 | ✅ 採用(batch 6) | `handle.getScrollPosition()`(未マウント時 `null`)/ `handle.setScrollPosition()`(クランプあり)/ `props.onScroll`(rAF 間引き・`source: 'user' \| 'api'`) |
+| 9 | ✅ 採用(batch 7・**v0.29.1**・2026-08-30) | pointerdown 系 4 箇所(セル / 行ヘッダー / 列ヘッダー / コーナー)の `focus()` に `{ preventScroll: true }`。回帰テスト 3 件(`HTMLElement.prototype.focus` の spy)。公開 API 変更なし |
 
 採用時の comparison-grid 側の対応は同日反映済み: #1 `GridCellStyleContext<T>` を `CellStyleContext<T>` の別名に変更、#2 `ComparisonPane` の `rows as T[]` キャスト削除、#3 `ComparisonView.test.tsx` の自前スタブを `installJsdomLayoutStubs()` へ置換、peer 範囲を `>=0.29.0 <1.0.0` へ更新。#8 により Phase 2「左右整列モード」のスクロール同期が実装可能になった。
+
+#9 は v0.29.1 公開後に comparison-grid 側で peer 範囲を `>=0.29.1 <1.0.0` へ更新し、同じ Playwright スクリプト(viewport 900px / root 下端 934px でセルを 1 クリック)で **スクロール 0 / 選択 1 行** を確認済み(修正前は 33px / 2 行)。comparison-grid 側の暫定回避は入れていなかったため、外すものはない。
 
 ---
 
