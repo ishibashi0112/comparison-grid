@@ -16,6 +16,7 @@ Side-by-side **two-list comparison** for **React 19**, built on top of [`@ishiba
 - **Four diff kinds** — `same` / `left-only` / `right-only` / `field-diff`, with a generated label (`"左のみ"`, `"数量・支給区分違い"`, …) that you can reword or replace.
 - **`useComparison()`** — derives `visibleLeft` / `visibleRight` (diff-only filter), `effectiveShowDiffOnly` (never `true` when one side is empty), `canShowDiffOnly` (for disabling the toggle), per-side counts and duplicate-key reports.
 - **Aligned mode (`alignRows`)** — both panes get the same length in match order, with placeholder rows (styled `.cmpg-row-placeholder`) inserted on the missing side; the diff-only filter works per pair so alignment is preserved.
+- **Hierarchical comparison (`useTreeComparison()`)** — for BOM-like trees. Build a tree from flat rows (`buildComparisonTree`: depth-first + level, or adjacency list), and the library derives **path keys** (`B2002/C3001`) so the same part under a different parent never pairs; representative-code substitution propagates to descendants; sibling duplicates get an occurrence suffix; broken input is reported as `issues`, never repaired. Aligned mode becomes a structural merge (right-only subtrees land next to their siblings) and the diff-only filter keeps ancestors as dimmed context rows.
 - **Scroll sync (`enableScrollSync`)** — keeps both panes' vertical scroll in lockstep (user scrolls propagate, API-driven ones are ignored to prevent loops). Pairs naturally with `alignRows`.
 - **Export (`getComparisonExportData()`)** — one side's rows + diff label column in the same `{ columns, rows: { value, text }[][] }` shape as the grid's `getExportData()`, so downstream CSV/Excel code can be shared.
 - **Diff navigation (`useComparisonNavigation()`)** — next/previous-diff jumping that scrolls both panes to the matching pair (wraps around; understands `alignRows` placeholders).
@@ -182,27 +183,36 @@ Define the functions outside the component (or memoize them) — a new function 
 
 ### Hierarchical data (BOM trees): match by path, not by code
 
-Matching by part number alone pairs "the same child under a *different* parent". Build a tree and let the library derive **path keys** (`B2002/C3001`); representative-code substitution then propagates to descendants automatically.
+Matching by part number alone pairs "the same child under a *different* parent". Build a tree and use `useTreeComparison` — the library derives **path keys** (`B2002/C3001`), representative-code substitution propagates to descendants, aligned mode becomes a structural merge, and the diff-only filter keeps ancestors as context rows (`.cmpg-row-context`).
 
-```ts
-import { buildComparisonTree, flattenComparisonTree, compare, alignComparisonTree } from '@ishibashi0112/comparison-grid';
+```tsx
+import { buildComparisonTree, useTreeComparison, ComparisonView } from '@ishibashi0112/comparison-grid';
 
-// Expansion output (depth-first order + level) — no ids needed:
-const leftTree = buildComparisonTree(leftRows, { getLevel: (r) => r.levelNo });
-// Adjacency list — ids must be unique per occurrence (never the part number):
-// const leftTree = buildComparisonTree(leftRows, { getId: (r) => r.rowId, getParentId: (r) => r.parentRowId });
+const getLevel = (r: BomRow) => r.levelNo;
+const getCode = (r: BomRow) => r.itemCode;
+const getRepresentativeCode = (r: BomRow) => r.reprItemCode;
+
+// Expansion output (depth-first order + level) — no ids needed. Adjacency lists work too:
+//   buildComparisonTree(rows, { getId: (r) => r.rowId, getParentId: (r) => r.parentRowId })
+//   (ids must be unique per occurrence — never the part number).
+const leftTree = useMemo(() => buildComparisonTree(leftRows, { getLevel }), [leftRows]);
+const rightTree = useMemo(() => buildComparisonTree(rightRows, { getLevel }), [rightRows]);
 leftTree.issues; // level-jump / duplicate-id / missing-parent / cycle — reported, never repaired
 
-const keyOptions = { getCode: (r: BomRow) => r.itemCode, getRepresentativeCode: (r: BomRow) => r.reprItemCode };
-const flatLeft = flattenComparisonTree(leftTree.roots, keyOptions);
-const flatRight = flattenComparisonTree(rightTree.roots, keyOptions);
-const result = compare(flatLeft.rows, flatRight.rows, {
-  getMatchKey: (r) => flatLeft.infos.get(r)?.matchKey ?? flatRight.infos.get(r)?.matchKey ?? '',
+const comparison = useTreeComparison<BomRow>({
+  left: leftTree.roots,
+  right: rightTree.roots,
+  getCode,
+  getRepresentativeCode: useRepresentative ? getRepresentativeCode : undefined,
   compareFields,
+  showDiffOnly,
+  alignRows,
 });
-// Structural alignment: right-only subtrees land next to their siblings, not at the end.
-const aligned = alignComparisonTree(leftTree.roots, rightTree.roots, result.leftDiffs);
+comparison.getTreeInfo(row); // { depth, parent, hasChildren, occurrence, matchKey }
+<ComparisonView comparison={comparison} columns={columns} />
 ```
+
+Headless: `flattenComparisonTree(roots, { getCode })` gives depth-first `rows` plus an `infos` map with each row's `matchKey`; feed them to `compare()` and `alignComparisonTree()`.
 
 Siblings with the same code under one parent get an occurrence suffix (`#1`, `#2`) instead of colliding; include a position/process field in `getCode` when you have one. Expanding an item-level BOM master (parent/child edges) into per-occurrence rows is outside the library — pass the expanded rows.
 
@@ -271,6 +281,7 @@ MIT
 - **4 種類の差分** — `same` / `left-only` / `right-only` / `field-diff` と、生成ラベル(`"左のみ"`、`"数量・支給区分違い"` など)。文言の差し替え / 完全カスタムが可能。
 - **`useComparison()`** — `visibleLeft` / `visibleRight`(差分のみフィルタ)、`effectiveShowDiffOnly`(片側が空なら常に `false`)、`canShowDiffOnly`(トグルの無効化条件)、片側ごとの件数、キー重複の報告を導出します。
 - **左右整列モード(`alignRows`)** — 両ペインを突き合わせ順の同じ長さに揃え、欠損側へプレースホルダ行(`.cmpg-row-placeholder`)を挿入。「差分のみ」は対の単位でフィルタされ、整列が保たれます。
+- **階層比較(`useTreeComparison()`)** — 部品表のような木構造向け。平坦な行から木を組み立て(`buildComparisonTree`: 深さ優先順 + level、または隣接リスト)、ライブラリが**パスキー**(`B2002/C3001`)を導出するので、別の親の下の同じ品番が突き合うことがありません。代表品番の置き換えは子孫へ伝播、兄弟の重複には出現番号、入力の破綻は修復せず `issues` で報告。整列モードは構造マージ(右のみサブツリーが兄弟の位置に入る)になり、「差分のみ」では祖先が薄い文脈行として残ります。
 - **スクロール同期(`enableScrollSync`)** — 左右ペインの縦スクロールを同期(ユーザー操作のみ伝播し、API 由来は無視してループを防止)。`alignRows` との併用を想定。
 - **エクスポート(`getComparisonExportData()`)** — 片側の行 + 差分ラベル列を、本体の `getExportData()` と同形(`{ columns, rows: { value, text }[][] }`)で返します。CSV / Excel 出力の下流処理を共用できます。
 - **差分ジャンプ(`useComparisonNavigation()`)** — 次 / 前の差分へ両ペインを対でスクロール(末尾からは先頭へラップ。`alignRows` のプレースホルダ位置も理解します)。
@@ -437,27 +448,36 @@ useComparison({ ..., getMatchKey: useRepresentative ? byRepresentative : byPath 
 
 #### 階層データ(部品表の木)はコードでなくパスで突き合わせる
 
-品番だけで突き合わせると「*別の親*の下の同じ品番」同士が対になってしまいます。木を組み立て、ライブラリに**パスキー**(`B2002/C3001`)を導出させてください。代表コードの置き換えは子孫へ自動で伝播します。
+品番だけで突き合わせると「*別の親*の下の同じ品番」同士が対になってしまいます。木を組み立てて `useTreeComparison` を使うと、ライブラリが**パスキー**(`B2002/C3001`)を導出し、代表コードの置き換えは子孫へ伝播、整列モードは構造マージになり、「差分のみ」では祖先が文脈行(`.cmpg-row-context`)として残ります。
 
-```ts
-import { buildComparisonTree, flattenComparisonTree, compare, alignComparisonTree } from '@ishibashi0112/comparison-grid';
+```tsx
+import { buildComparisonTree, useTreeComparison, ComparisonView } from '@ishibashi0112/comparison-grid';
 
-// 展開結果(深さ優先順 + level)から — ID 不要:
-const leftTree = buildComparisonTree(leftRows, { getLevel: (r) => r.levelNo });
-// 隣接リストから — ID は出現ごとに一意な行 ID(品番は不可):
-// const leftTree = buildComparisonTree(leftRows, { getId: (r) => r.rowId, getParentId: (r) => r.parentRowId });
+const getLevel = (r: BomRow) => r.levelNo;
+const getCode = (r: BomRow) => r.itemCode;
+const getRepresentativeCode = (r: BomRow) => r.reprItemCode;
+
+// 展開結果(深さ優先順 + level)から — ID 不要。隣接リストも可:
+//   buildComparisonTree(rows, { getId: (r) => r.rowId, getParentId: (r) => r.parentRowId })
+//   (ID は出現ごとに一意な行 ID。品番は不可)。
+const leftTree = useMemo(() => buildComparisonTree(leftRows, { getLevel }), [leftRows]);
+const rightTree = useMemo(() => buildComparisonTree(rightRows, { getLevel }), [rightRows]);
 leftTree.issues; // level-jump / duplicate-id / missing-parent / cycle — 修復せず報告
 
-const keyOptions = { getCode: (r: BomRow) => r.itemCode, getRepresentativeCode: (r: BomRow) => r.reprItemCode };
-const flatLeft = flattenComparisonTree(leftTree.roots, keyOptions);
-const flatRight = flattenComparisonTree(rightTree.roots, keyOptions);
-const result = compare(flatLeft.rows, flatRight.rows, {
-  getMatchKey: (r) => flatLeft.infos.get(r)?.matchKey ?? flatRight.infos.get(r)?.matchKey ?? '',
+const comparison = useTreeComparison<BomRow>({
+  left: leftTree.roots,
+  right: rightTree.roots,
+  getCode,
+  getRepresentativeCode: useRepresentative ? getRepresentativeCode : undefined,
   compareFields,
+  showDiffOnly,
+  alignRows,
 });
-// 構造整列: 右にしか無いサブツリーは末尾でなく兄弟の位置に入る。
-const aligned = alignComparisonTree(leftTree.roots, rightTree.roots, result.leftDiffs);
+comparison.getTreeInfo(row); // { depth, parent, hasChildren, occurrence, matchKey }
+<ComparisonView comparison={comparison} columns={columns} />
 ```
+
+headless で使う場合は `flattenComparisonTree(roots, { getCode })` が深さ優先順の `rows` と、行ごとの `matchKey` を持つ `infos` を返すので、`compare()` と `alignComparisonTree()` に渡します。
 
 同じ親の下に同じコードの兄弟が複数ある場合は衝突させず出現番号(`#1`, `#2`)を付けます。取付位置・工程の列があるなら `getCode` に含めてください。品目間の構成マスタ(親品番・子品番)から出現ごとの行へ**展開**する処理はライブラリの範囲外です(展開済みの行を渡します)。
 

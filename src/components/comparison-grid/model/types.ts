@@ -329,6 +329,8 @@ export type ComparisonPaneProps<T extends object> = ComparisonHighlightOptions &
     keyColumnKeys?: readonly string[];
     /** この側の rows に含まれるプレースホルダ行(.cmpg-row-placeholder を付与)。 */
     placeholderRows?: ReadonlySet<T>;
+    /** この側の rows に含まれる文脈行(木モードの「差分のみ」で残した差分行の祖先。.cmpg-row-context を付与)。 */
+    contextRows?: ReadonlySet<T>;
     header?: ReactNode;
     /** ヘッダースロットの描画。既定は header !== undefined。 */
     showHeader?: boolean;
@@ -337,12 +339,14 @@ export type ComparisonPaneProps<T extends object> = ComparisonHighlightOptions &
     style?: CSSProperties;
   };
 
-/** ComparisonView が useComparison の結果から使う部分。placeholders は alignRows 利用時のみ必要。 */
+/** ComparisonView が useComparison / useTreeComparison の結果から使う部分。
+ *  placeholders は alignRows 利用時、contextRows は木モードの「差分のみ」利用時のみ必要。 */
 export type ComparisonViewModel<T> = Pick<
   UseComparisonResult<T>,
   'visibleLeft' | 'visibleRight' | 'leftDiffs' | 'rightDiffs' | 'compareFields'
 > &
-  Partial<Pick<UseComparisonResult<T>, 'placeholders'>>;
+  Partial<Pick<UseComparisonResult<T>, 'placeholders'>> &
+  Partial<Pick<UseTreeComparisonResult<T>, 'contextRows'>>;
 
 export type ComparisonViewProps<T extends object> = ComparisonHighlightOptions &
   ComparisonDiffLabelColumnProps<T> & {
@@ -442,4 +446,24 @@ export type FlattenComparisonTreeResult<T> = {
   /** 深さ優先順の行。 */
   rows: T[];
   infos: ReadonlyMap<T, ComparisonTreeInfo<T>>;
+};
+
+/** 木モードの「差分のみ」で、差分行の祖先として残した文脈行(kind は same)。行オブジェクトの同一性で判定。 */
+export type ComparisonContextRows<T> = {
+  left: ReadonlySet<T>;
+  right: ReadonlySet<T>;
+};
+
+/** useTreeComparison のオプション。useComparison の left / right / getMatchKey を木とキー導出設定に置き換えたもの。 */
+export type UseTreeComparisonOptions<T> = Omit<UseComparisonOptions<T>, 'left' | 'right' | 'getMatchKey'> &
+  ComparisonTreeKeyOptions<T> & {
+    left: readonly ComparisonTreeNode<T>[];
+    right: readonly ComparisonTreeNode<T>[];
+  };
+
+export type UseTreeComparisonResult<T> = UseComparisonResult<T> & {
+  /** 「差分のみ」で残した文脈行(OFF のときは空 Set)。ComparisonView へ comparison を渡せば自動で配線される。 */
+  contextRows: ComparisonContextRows<T>;
+  /** 左右どちらの行でも階層情報(depth / parent / hasChildren / occurrence / matchKey)を引ける参照関数。 */
+  getTreeInfo: (row: T) => ComparisonTreeInfo<T> | undefined;
 };

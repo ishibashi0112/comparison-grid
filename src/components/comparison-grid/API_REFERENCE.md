@@ -4,7 +4,7 @@
 > `view/*.tsx`)から手で起こした公開 API のスナップショットです。**型を変更したら本ファイルも同期してください。**
 > spreadsheet-grid 側の props / 型は [spreadsheet-grid の API_REFERENCE](https://github.com/ishibashi0112/datasheet-grid/blob/main/src/components/spreadsheet-grid/API_REFERENCE.md) を参照。
 
-最終更新: 2026-08-30(batch 15a: 階層比較の純ロジックを追加)。
+最終更新: 2026-08-30(batch 15a / 15b: 階層比較 — 純ロジック + `useTreeComparison` + 文脈行)。
 
 ## 設計の要点
 
@@ -208,6 +208,49 @@ const result = compare(flatLeft.rows, flatRight.rows, {
 
 **メモ化**: `left` / `right` / `getMatchKey` / `formatDiffLabel` / `duplicateKeyPolicy` / `createPlaceholderRow` は参照(同一性)で、`compareFields` / `labels` は**浅い構造比較**で依存を判定します。つまり `compareFields: [{ key: 'qty', label: '数量' }]` のようなインライン記述は毎レンダー書き直しても再計算されませんが、`getValue` / `equals` / `getMatchKey` / `createPlaceholderRow` をインライン関数で書くと毎レンダー再計算されます(コンポーネント外か `useCallback` で定義してください。特に `createPlaceholderRow` はプレースホルダ行の同一性が毎レンダー変わり、グリッドが行の差し替えと誤認します)。
 
+### `useTreeComparison<T>(options): UseTreeComparisonResult<T>`
+
+`useComparison` の**木版**。左右の木(`ComparisonTreeNode<T>[]`)を深さ優先に平坦化し、木から導出したパスキーで `compare()` を回します。利用側は `getMatchKey` を書かず、`getCode`(+ `getRepresentativeCode`)を渡すだけです。戻り値は `UseComparisonResult<T>` と同形(`ComparisonView` / `useComparisonNavigation` / `getComparisonExportData` にそのまま渡せる)で、木固有の値が加わります。
+
+`UseTreeComparisonOptions<T>` = `UseComparisonOptions<T>` から `left` / `right` / `getMatchKey` を除き、下記を加えたもの:
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `left` / `right` | `readonly ComparisonTreeNode<T>[]` | (required) | 左右の木(`buildComparisonTree(rows, …).roots` など)。**同じ参照を渡し続ければ表示配列の参照も安定**する(`useMemo` で組み立てる)。 |
+| `getCode` / `getRepresentativeCode` / `separator` | `ComparisonTreeKeyOptions<T>` | — | キー導出設定(`flattenComparisonTree` と同じ)。`getRepresentativeCode` を付け外しすると「代表品番比較」の ON / OFF になる。 |
+| `showDiffOnly` / `alignRows` / `createPlaceholderRow` / `compareFields` / `labels` / `formatDiffLabel` / `duplicateKeyPolicy` | — | — | `useComparison` と同じ。 |
+
+`useComparison` との挙動の違い:
+
+- **「差分のみ」は差分行に加えて、その祖先(文脈行)を残します。** `C3001` の差分が「どの ASSY の」か分かるようにするため。文脈行は `kind === 'same'` のままで、`contextRows` に集約され `ComparisonView` が `.cmpg-row-context` を付与します(既定で文字色が薄くなる)。差分の祖先ではない `same` 行(葉も ASSY も)は落ちます。
+- **`alignRows` は構造マージ(`alignComparisonTree`)。** 右にしか無いサブツリーが末尾ではなく兄弟の位置に入ります。「差分のみ」との併用は対の単位でフィルタ(どちらかの側が残す行なら対ごと残す)。
+- `visibleLeft` / `visibleRight` は平坦化した配列で、入力(木)と同一参照にはなりません。
+
+戻り値に加わるもの:
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `contextRows` | `{ left: ReadonlySet<T>; right: ReadonlySet<T> }` | 「差分のみ」で残した文脈行(OFF のときは空 Set)。`ComparisonView` へ `comparison` を渡せば自動で配線される。 |
+| `getTreeInfo` | `(row: T) => ComparisonTreeInfo<T> \| undefined` | 左右どちらの行でも階層情報(`depth` / `parent` / `hasChildren` / `occurrence` / `matchKey`)を引ける(Level 列のインデント等に。プレースホルダ行は `undefined`)。 |
+
+```tsx
+const leftTree = useMemo(() => buildComparisonTree(leftRows, { getLevel }), [leftRows]);
+const rightTree = useMemo(() => buildComparisonTree(rightRows, { getLevel }), [rightRows]);
+const comparison = useTreeComparison<BomRow>({
+  left: leftTree.roots,
+  right: rightTree.roots,
+  getCode,                                                       // (row) => row.itemCode
+  getRepresentativeCode: useRepresentative ? getReprCode : undefined,
+  compareFields,
+  showDiffOnly,
+  alignRows,
+});
+const navigation = useComparisonNavigation({ comparison, alignRows });
+<ComparisonView comparison={comparison} columns={columns} … />
+```
+
+**メモ化**: `left` / `right`(木)/ `getCode` / `getRepresentativeCode` / `separator` は参照(同一性)で依存を判定します。アクセサはコンポーネント外で定義してください。`buildComparisonTree` は毎回新しい木を返すので `useMemo` で包みます。
+
 ### `useComparisonNavigation<T>(options): UseComparisonNavigationResult<T>`
 
 差分ジャンプ(次 / 前の差分行へのスクロール)。グリッドのハンドル `ref` は**フックが生成して返す**ので、`leftGridProps={{ ref: leftRef }}` / `rightGridProps={{ ref: rightRef }}` で配線します(`enableScrollSync` の内部 ref とは自動で合成されます)。
@@ -223,7 +266,7 @@ const result = compare(flatLeft.rows, flatRight.rows, {
 | Name | Type | Description |
 | --- | --- | --- |
 | `leftRef` / `rightRef` | `RefObject<SpreadsheetGridHandle<T> \| null>` | 各ペインへ渡すハンドル ref。 |
-| `diffStops` | `readonly ComparisonDiffStop<T>[]` | 停止位置(`visibleLeft` の行順 → 左に無い右行は `visibleRight` の行順で末尾。alignRows の対順と同じ規則)。各停止は `kind` / `leftIndex` / `rightIndex` / `leftRow` / `rightRow` を持つ。 |
+| `diffStops` | `readonly ComparisonDiffStop<T>[]` | 停止位置(`visibleLeft` の行順 → 左に無い右行は `visibleRight` の行順で末尾。平坦な alignRows の対順と同じ規則)。`alignRows: true` では左右の index が同じ行位置を指すため**行位置順**に並ぶ(木モードの構造整列で右のみが途中に入っても表示順どおりになる)。各停止は `kind` / `leftIndex` / `rightIndex` / `leftRow` / `rightRow` を持つ。 |
 | `diffCount` / `canNavigate` | `number` / `boolean` | 停止数 / `diffCount > 0`(ボタンの `disabled` に)。 |
 | `activeDiffIndex` | `number` | 現在の停止位置(未移動は `-1`)。表示行が変わるとリセット。 |
 | `goToNextDiff()` / `goToPreviousDiff()` / `goToDiff(index)` | `() => void` 等 | 移動(範囲外はラップ: 末尾の次は先頭、未移動からの「前」は末尾)。 |
@@ -261,7 +304,7 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `comparison` | `ComparisonViewModel<T>` | (required) | `useComparison` の戻り値をそのまま渡す(`visibleLeft` / `visibleRight` / `leftDiffs` / `rightDiffs` / `compareFields`、alignRows 利用時は `placeholders` も使用)。 |
+| `comparison` | `ComparisonViewModel<T>` | (required) | `useComparison` / `useTreeComparison` の戻り値をそのまま渡す(`visibleLeft` / `visibleRight` / `leftDiffs` / `rightDiffs` / `compareFields`、alignRows 利用時は `placeholders`、木モードの「差分のみ」では `contextRows` も使用)。 |
 | `columns` | `readonly GridColumn<T>[]` | (required) | 利用側の列定義(両ペイン共通)。参照安定化(浅い構造比較)される。 |
 | `keyColumnKeys` | `readonly string[]` | — | 突き合わせキー相当の列キー。`left-only` / `right-only` 行でその列のセルを強調。 |
 | `leftHeader` / `rightHeader` | `ReactNode` | — | ペイン上部のスロット。片側だけ指定しても両ペインに(空の)スロットを描画して上端を揃える。 |
@@ -288,6 +331,7 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 | `compareFields` | `readonly CompareField<T>[]` | — | セル強調の対応付け(`useComparison().compareFields`)。 |
 | `keyColumnKeys` | `readonly string[]` | — | 同上。 |
 | `placeholderRows` | `ReadonlySet<T>` | — | この側の `rows` に含まれるプレースホルダ行(`placeholders.left` 等)。`.cmpg-row-placeholder` を付与する。 |
+| `contextRows` | `ReadonlySet<T>` | — | この側の `rows` に含まれる文脈行(`useTreeComparison().contextRows.left` 等)。`.cmpg-row-context` を付与する。 |
 | `header` | `ReactNode` | — | ヘッダースロット。 |
 | `showHeader` | `boolean` | `header !== undefined` | スロットの描画有無(片側だけヘッダーがある場合の高さ揃えに)。 |
 | `gridProps` | `ComparisonGridProps<T>` | — | 透過 props。 |
@@ -326,6 +370,7 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 | `.cmpg-row-diff` | 行コンテナ + 各データセル | `same` 以外の行。修飾子 `--left-only` / `--right-only` / `--field`。 |
 | `.cmpg-cell-diff` | セル | 強調セル共通。修飾子 `--key`(キー列 × 片側のみ行)/ `--field`(差分フィールド列 × field-diff 行)。 |
 | `.cmpg-row-placeholder` | 行コンテナ + 各データセル | alignRows で欠損側に入るプレースホルダ行。差分ハイライトとは独立で、`enableRowHighlight={false}` でも付与される。 |
+| `.cmpg-row-context` | 行コンテナ + 各データセル | 木モードの「差分のみ」で差分行の祖先として残る文脈行(`kind` は `same`)。差分ハイライトとは独立で、`enableRowHighlight={false}` でも付与される。 |
 
 ハイライトの実体は `.ssg-body-cell.cmpg-row-diff { background }` / `.ssg-body-cell.cmpg-cell-diff { color; font-weight }`(特異度 (0,2,0))。行ホバーは `.ssg-body-cell.cmpg-row-diff.ssg-body-cell--row-hovered` で `--cmpg-diff-row-hover-bg` に切り替わります。
 
@@ -343,6 +388,7 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 | `--cmpg-diff-font-weight` | `:where(.cmpg-pane)` | `700` | — |
 | `--cmpg-placeholder-row-bg` | `:where(.cmpg-pane)` | `#f3f4f6` | `rgba(148, 163, 184, 0.1)` |
 | `--cmpg-placeholder-row-hover-bg` | `:where(.cmpg-pane)` | `#e5e7eb` | `rgba(148, 163, 184, 0.18)` |
+| `--cmpg-context-row-text` | `:where(.cmpg-pane)` | `#6b7280` | `#9ca3af` |
 
 上書きは `.cmpg-pane { --cmpg-diff-row-bg: ... }`(light)/ `.cmpg-pane .ssg-theme-dark { ... }`(dark)。`:where()` 定義のため読み込み順に依らず勝ちます。
 
@@ -367,7 +413,11 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 - 左右の行の位置は既定では揃えません(ss2602 と同じ)。揃えたい場合は `alignRows: true`(左右整列モード)。プレースホルダ行は差分 Map に載らないため `getDiff()` は `undefined` を返します(`placeholders` の Set で判定してください)。
 - `alignRows` のプレースホルダ行は既定で `{} as T` です。`row.foo.bar` のような入れ子アクセスをする `getValue` / `renderCell` / `valueFormatter` がある列では `createPlaceholderRow` で安全な行を返してください。
 - グリッドの行グルーピング(`rowGroup`)を有効にした場合、グループ行には差分クラスは付きません(leaf 行のみ)。
+- 木モード(`useTreeComparison`)の `visibleLeft` / `visibleRight` は平坦化した配列で、入力と同一参照にはなりません(木の参照が同じなら安定)。渡す木は `useMemo` で組み立ててください。
+- 木モードは「展開済みの、出現 1 回 = 1 行」のデータを前提にします。行が深さ優先順に並んでいない・親参照に品番を使っている等の破綻は `buildComparisonTree(...).issues` で**検出**できますが**修復**はされません。品目間の構成マスタ(DAG)からの展開はライブラリの範囲外です。
 
 ## Phase 2
 
 初版時の候補はすべて実装済みです: 左右整列モード(`alignRows`)/ スクロール同期(`enableScrollSync`)/ エクスポート(`getComparisonExportData`)/ 差分ジャンプ(`useComparisonNavigation`)/ マニュアル入力(`useManualRows`)/ 色覚多様性プリセット(`.cmpg-colors-cvd`)。経緯と設計判断は `docs/DESIGN_NOTES.md` を参照。
+
+階層比較(`buildComparisonTree` / `flattenComparisonTree` / `alignComparisonTree` / `useTreeComparison`)は batch 15 で追加。残候補: 親への差分ロールアップ表示(「配下に差分あり」マーク。`getTreeInfo` + `getDiff` で利用側でも書ける)/ サブツリーの折りたたみ。

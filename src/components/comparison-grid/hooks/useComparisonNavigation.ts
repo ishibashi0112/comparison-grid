@@ -1,6 +1,7 @@
 // 差分ジャンプ(次 / 前の差分行へのスクロール)のフックです。
 //   - 停止位置は visibleLeft の行順に対を作り、左に無い右行(right-only 等)を visibleRight の
-//     行順で末尾に置きます(alignRows の対順と同じ規則。整列表示でも順序が一致します)。
+//     行順で末尾に置きます(平坦な alignRows の対順と同じ規則)。alignRows では左右の index が
+//     同じ行位置を指すため、行位置順に並べ替えます(木モードの構造整列では右のみが途中に入る)。
 //   - グリッドのハンドル ref はこのフックが生成して返します(leftGridProps={{ ref: leftRef }} で
 //     配線)。ref の参照はイベントハンドラ(goTo*)内に限定し、render 中には触りません。
 //   - scrollToRow は view index を受け取るため、グリッド側のソート / フィルターを併用すると
@@ -56,8 +57,14 @@ export function useComparisonNavigation<T>(
       }
       stops.push({ kind, rightIndex: index, rightRow: row });
     });
+    if (alignRows) {
+      // 整列表示では leftIndex / rightIndex が同じ行位置。表示順(= 行位置順)に安定ソートする。
+      stops.sort(
+        (a, b) => (a.leftIndex ?? a.rightIndex ?? 0) - (b.leftIndex ?? b.rightIndex ?? 0),
+      );
+    }
     return stops;
-  }, [visibleLeft, visibleRight, leftDiffs, rightDiffs]);
+  }, [visibleLeft, visibleRight, leftDiffs, rightDiffs, alignRows]);
 
   // データ(= diffStops)が変わったら現在位置をリセットする(条件付き render 中 setState パターン)。
   const [active, setActive] = useState<{

@@ -1,14 +1,13 @@
 // デモ用の BOM(部品構成)モックデータです。ss2602 の API(GetComponentsInfo)の代役として、
 //   品番ごとの展開結果を返します。ライブラリはこの型を知りません(利用側の T)。
 export type BomRow = {
-  /** 階層パス(ルートを除く品目コードを '/' で連結)。突き合わせキーに使う。 */
-  itemPath: string;
   rootItemCode: string;
   rootItemName: string;
   rootItemSpec: string;
+  /** 階層(1 始まり)。展開結果は深さ優先順で並ぶ(buildComparisonTree の getLevel に渡す)。 */
   levelNo: number;
   itemCode: string;
-  /** 代表品番(無ければ '')。「代表品番比較」ON のとき突き合わせキーに使う。 */
+  /** 代表品番(無ければ '')。「代表品番比較」ON のとき自品番の代わりにキーのセグメントになる(子孫へ伝播)。 */
   reprItemCode: string;
   itemName: string;
   spec: string;
@@ -40,13 +39,9 @@ const s = (
   reprItemCode?: string,
 ): Seed => ({ level, itemCode, itemName, spec, shikiyuKbn, qty, reprItemCode });
 
-const buildRows = (root: RootItemInfo, seeds: readonly Seed[]): BomRow[] => {
-  const stack: string[] = [];
-  return seeds.map((seed) => {
-    stack.length = Math.max(0, seed.level - 1);
-    stack.push(seed.itemCode);
+const buildRows = (root: RootItemInfo, seeds: readonly Seed[]): BomRow[] =>
+  seeds.map((seed) => {
     return {
-      itemPath: stack.join('/'),
       rootItemCode: root.code,
       rootItemName: root.name,
       rootItemSpec: root.spec,
@@ -59,7 +54,6 @@ const buildRows = (root: RootItemInfo, seeds: readonly Seed[]): BomRow[] => {
       qty: seed.qty,
     };
   });
-};
 
 // 旧構成。
 const A1000 = buildRows({ code: 'A1000', name: '制御ユニット', spec: '100V 仕様' }, [
@@ -80,11 +74,13 @@ const A1000 = buildRows({ code: 'A1000', name: '制御ユニット', spec: '100V
 ]);
 
 // 新構成(Rev.2)。カバー / 電源ケーブルは後継品番(代表品番で旧品番を指す)へ置き換え。
+//   モーターASSY は ASSY ごと後継品番(子は同じ)にしてあり、通常比較ではサブツリー丸ごと左のみ + 右のみ、
+//   代表品番比較 ON では親の置き換えが子へ伝播して子同士が突き合う(数量 / 支給区分違いになる)。
 const A1000_R2 = buildRows(
   { code: 'A1000-R2', name: '制御ユニット (Rev.2)', spec: '100V/200V 仕様' },
   [
     s(1, 'B2001', 'ブラケット', 'SUS304 t2.0', '無', '2'),
-    s(1, 'B2002', 'モーターASSY', '-', '無', '1'),
+    s(1, 'B2002A', 'モーターASSY改', '-', '無', '1', 'B2002'),
     s(2, 'C3001', 'DCモーター', '24V 20W', '無', '2'),
     s(2, 'C3002', 'ハーネス', '300mm', '有', '1'),
     s(2, 'C3003', '六角穴付ボルト', 'M4x10', '有', '6'),
@@ -195,7 +191,8 @@ const isQuietZone = (rowIndex: number) => Math.floor(rowIndex / 100) % 3 === 1;
  *   - level 2 以下のサブツリー削除(71 行に 1 回)                → 左のみ
  *   - ASSY 8 個に 1 個、末尾へ新規部品を追加                     → 右のみ
  *   - 子を持たない level 2 部品 29 個に 1 個を後継品番へ置換     → 通常は左のみ + 右のみ、
- *     代表品番比較 ON では同一(または項目違い)として突き合う */
+ *     代表品番比較 ON では同一(または項目違い)として突き合う
+ *     (葉に限定しているのはデータの安定のため。親の置換も子へ伝播するので制約ではない) */
 const deriveRevisionSeeds = (base: readonly Seed[]): Seed[] => {
   const out: Seed[] = [];
   let assemblyIndex = -1;

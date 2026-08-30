@@ -85,6 +85,15 @@
 - **構造整列(`alignComparisonTree`)**: 兄弟リスト単位のマージ。右のみサブツリーは**直前に対になった兄弟の直後**、先行する対が無ければ最初の対の直前、対が無ければ末尾(平坦版と同じ)。相手は同じ兄弟リストに居る counterpart のみ(キーがパスなら必ずそうなる。別規則のキーでも壊れない)。
 - React 層(`useTreeComparison` / 文脈行 / デモ置き換え)は batch 15b。
 
+### 実装済み(2026-08-30・batch 15b。階層比較の React 層 + デモの木化)
+
+- **`useTreeComparison`**: `useComparison` の木版。木 → `flattenComparisonTree` → 導出キーで `compare()`。戻り値は `UseComparisonResult` と同形 + `contextRows` / `getTreeInfo`。`ComparisonView` / `useComparisonNavigation` / `getComparisonExportData` にそのまま渡せる。`useComparison` を内部で呼ばず独立実装にしたのは、整列(構造マージ)と「差分のみ」(祖先を残す)の規則が平坦版と異なるため(共通化すると平坦版に木の概念が漏れる)。
+- **「差分のみ」で祖先を残す(推奨 1)**: 差分行 + その祖先(文脈行)。文脈行は `kind === 'same'` のまま `contextRows` に集約し、`ComparisonView` → `ComparisonPane` → `composeRowClassName` で `.cmpg-row-context`(文字色 `--cmpg-context-row-text`、gray-500)を付与。プレースホルダ行と同じく差分ハイライトとは独立(`enableRowHighlight={false}` でも付く)。`alignRows` との併用は「どちらかの側が残す行なら対ごと残す」。
+- **ロールアップ(推奨 2)**: 祖先の保持に必要な「配下に差分あり」の計算は `collectKeptRows` に内在するが、公開はしていない(表示マーカーは残候補。`getTreeInfo` + `getDiff` で利用側でも書ける)。
+- **ナビゲーション**: `useComparisonNavigation` は `alignRows: true` のとき停止を**行位置順**に安定ソートする(木の構造整列では右のみが途中に入るため。平坦版では右のみが末尾に居るので並びは変わらない)。
+- **デモの木化**: `BomRow` から `itemPath` を廃止(行型は API の素の形へ)。`buildComparisonTree(rows, { getLevel })` + `useTreeComparison`。A1000-R2 の「モーターASSY」を ASSY ごと後継品番(`B2002A`、代表 `B2002`、子は同じ)にし、通常比較ではサブツリー丸ごと左のみ + 右のみ、代表品番比較 ON で子同士が突き合う(伝播)ことを目視できるようにした。`issues` 件数をサマリ行に表示。大量データ生成器の「後継品番は葉に限定」はデータ安定のため据え置き(キー規則上の制約ではなくなった)。
+- 残候補(batch 16 以降): 親への差分ロールアップ表示 / サブツリーの折りたたみ。
+
 ## 6. 環境メモ
 
 - spreadsheet-grid: `~/dev/datasheet-grid`(GitHub `ishibashi0112/datasheet-grid`)。v0.29.0 = npm latest(2026-08-29・提案対応リリース「proposals batch 1〜6」)。ss2602 は `^0.16.0` 固定なので、ライブラリ導入時に 0.29 系へ上げる必要がある(0.17〜0.28 で export scope の改名や既定値変更あり)。

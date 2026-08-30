@@ -28,7 +28,7 @@ export function ComparisonPane<T extends object>(props: ComparisonPaneProps<T>) 
     enableFieldCellHighlight = true,
     showDiffLabelColumn = false,
   } = props;
-  const { placeholderRows } = props;
+  const { placeholderRows, contextRows } = props;
   const columns = useStableArray(props.columns);
   const compareFields = useStableArray(props.compareFields);
   const keyColumnKeys = useStableArray(props.keyColumnKeys);
@@ -55,8 +55,15 @@ export function ComparisonPane<T extends object>(props: ComparisonPaneProps<T>) 
 
   const userGetRowClassName = gridProps?.getRowClassName;
   const getRowClassName = useMemo(
-    () => composeRowClassName(diffs, userGetRowClassName, enableRowHighlight, placeholderRows),
-    [diffs, userGetRowClassName, enableRowHighlight, placeholderRows],
+    () =>
+      composeRowClassName(
+        diffs,
+        userGetRowClassName,
+        enableRowHighlight,
+        placeholderRows,
+        contextRows,
+      ),
+    [diffs, userGetRowClassName, enableRowHighlight, placeholderRows, contextRows],
   );
 
   return (

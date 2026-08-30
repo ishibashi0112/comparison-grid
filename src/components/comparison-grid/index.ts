@@ -20,6 +20,7 @@ export { alignComparisonTree } from './logic/alignTree';
 export { CMPG_CLASS_NAMES, DEFAULT_DIFF_LABEL_COLUMN_KEY } from './logic/paneColumns';
 // React 層。
 export { useComparison } from './hooks/useComparison';
+export { useTreeComparison } from './hooks/useTreeComparison';
 export { useComparisonNavigation } from './hooks/useComparisonNavigation';
 export { useManualRows } from './hooks/useManualRows';
 export { ComparisonPane } from './view/ComparisonPane';
@@ -55,6 +56,9 @@ export type {
   ComparisonTreeKeyOptions,
   ComparisonTreeInfo,
   FlattenComparisonTreeResult,
+  ComparisonContextRows,
+  UseTreeComparisonOptions,
+  UseTreeComparisonResult,
   UseComparisonOptions,
   UseComparisonResult,
   ComparisonDiffStop,

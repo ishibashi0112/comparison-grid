@@ -5,8 +5,9 @@ import { useMemo, useState, type FormEvent } from 'react';
 import type { GridColumn, GridTheme } from '@ishibashi0112/spreadsheet-grid';
 import {
   ComparisonView,
-  useComparison,
+  buildComparisonTree,
   useComparisonNavigation,
+  useTreeComparison,
   type CompareField,
   type ComparisonGridProps,
 } from './components/comparison-grid';
@@ -26,11 +27,12 @@ const COMPARE_FIELDS: CompareField<BomRow>[] = [
   { key: 'shikiyuKbn', label: '支給区分' },
 ];
 
-// 突き合わせキー。代表品番比較 ON のときは階層パス中の自品番を代表品番へ置き換えたパスで比較する
-//   (ss2602 の makeCompareKey 相当。ライブラリはこの規則を知らず、getMatchKey の差し替えで表現する)。
-const getItemPathKey = (row: BomRow) => row.itemPath;
-const getReprItemPathKey = (row: BomRow) =>
-  row.itemPath.replace(row.itemCode, row.reprItemCode || row.itemCode);
+// 階層比較のアクセサ。展開結果は深さ優先順 + level で来るので、木の構築は getLevel だけでよい(行 ID 不要)。
+//   突き合わせキー(パス)はライブラリが木から導出する。代表品番比較 ON のときは getRepresentativeCode を
+//   渡し、自品番の代わりに代表品番をセグメントにする(親の置き換えは子孫へ伝播する)。
+const getLevel = (row: BomRow) => row.levelNo;
+const getItemCode = (row: BomRow) => row.itemCode;
+const getRepresentativeCode = (row: BomRow) => row.reprItemCode;
 
 // Level 列: 階層の深さに応じて左インデントを付けて表示する。
 //   左右整列(alignRows)のプレースホルダ行は空オブジェクトで来るため、renderCell を持つ列は
@@ -106,12 +108,18 @@ export default function App() {
   const [cvdColors, setCvdColors] = useState(false);
   const [enableGridFeatures, setEnableGridFeatures] = useState(false);
 
-  // 3. 比較: キーの取り方と差分フィールドを渡すだけ。実効的な「差分のみ」はフック側で導出される。
-  //    alignRows は左右を突き合わせ順の同じ長さに揃える(欠損側はプレースホルダ行)。
-  const comparison = useComparison<BomRow>({
-    left: leftRows,
-    right: rightRows,
-    getMatchKey: isReprItemMode ? getReprItemPathKey : getItemPathKey,
+  // 3. 木の構築: 平坦な展開結果 → 木。破綻(level の飛び等)は修復されず issues に報告される。
+  const leftTree = useMemo(() => buildComparisonTree(leftRows, { getLevel }), [leftRows]);
+  const rightTree = useMemo(() => buildComparisonTree(rightRows, { getLevel }), [rightRows]);
+  const treeIssueCount = leftTree.issues.length + rightTree.issues.length;
+
+  // 4. 比較: コードの取り方と差分フィールドを渡すだけ。キーは木から導出され、実効的な「差分のみ」は
+  //    フック側で導出される(差分行の祖先は文脈行として残る)。alignRows は構造マージで左右を揃える。
+  const comparison = useTreeComparison<BomRow>({
+    left: leftTree.roots,
+    right: rightTree.roots,
+    getCode: getItemCode,
+    getRepresentativeCode: isReprItemMode ? getRepresentativeCode : undefined,
     compareFields: COMPARE_FIELDS,
     showDiffOnly,
     alignRows,
@@ -314,6 +322,7 @@ export default function App() {
             {comparison.duplicateKeys.left.length > 0 || comparison.duplicateKeys.right.length > 0
               ? ' ※ キー重複あり'
               : ''}
+            {treeIssueCount > 0 ? ` ※ 階層の問題 ${treeIssueCount} 件(issues)` : ''}
           </p>
         ) : (
           <p className="demo-summary">
@@ -322,7 +331,7 @@ export default function App() {
         )}
       </header>
       <main className="demo-main">
-        {/* 4. 表示: 2 ペイン + 差分ハイライト + 差分ラベル列。列定義 T のまま渡せる。 */}
+        {/* 5. 表示: 2 ペイン + 差分ハイライト + 差分ラベル列。列定義 T のまま渡せる。 */}
         <ComparisonView<BomRow>
           comparison={comparison}
           columns={columns}
