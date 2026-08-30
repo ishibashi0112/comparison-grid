@@ -84,6 +84,15 @@
   cursor: default;
 }
 
+.demo-button--small {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.demo-presets {
+  gap: 6px;
+}
+
 .demo-toggle {
   display: inline-flex;
   align-items: center;

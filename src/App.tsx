@@ -10,7 +10,14 @@ import {
   type CompareField,
   type ComparisonGridProps,
 } from './components/comparison-grid';
-import { BOM_ITEM_CODES, fetchBom, type BomRow, type RootItemInfo } from './demo/bomData';
+import {
+  BOM_DATASETS,
+  BOM_ITEM_CODES,
+  BOM_PRESETS,
+  fetchBom,
+  type BomRow,
+  type RootItemInfo,
+} from './demo/bomData';
 import './App.css';
 
 // 1. 比較設定: 「差分を見る」フィールドを宣言するだけ。
@@ -142,16 +149,27 @@ export default function App() {
     [navigation.rightRef],
   );
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const loadBoms = async (left: string, right: string) => {
     setIsLoading(true);
     try {
-      const [nextLeft, nextRight] = await Promise.all([fetchBom(leftCode), fetchBom(rightCode)]);
+      const [nextLeft, nextRight] = await Promise.all([fetchBom(left), fetchBom(right)]);
       setLeftRows(nextLeft);
       setRightRows(nextRight);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void loadBoms(leftCode, rightCode);
+  };
+
+  // プリセット: 左右の品番を入れ替えてそのまま展開する(大量データでスクロール同期 / 差分ジャンプを確認)。
+  const applyPreset = (left: string, right: string) => {
+    setLeftCode(left);
+    setRightCode(right);
+    void loadBoms(left, right);
   };
 
   const handleReset = () => {
@@ -195,6 +213,21 @@ export default function App() {
           <button type="button" className="demo-button" onClick={handleReset} disabled={isLoading}>
             クリア
           </button>
+          <span className="demo-toggle demo-presets">
+            プリセット
+            {BOM_PRESETS.map((preset) => (
+              <button
+                key={preset.left}
+                type="button"
+                className="demo-button demo-button--small"
+                onClick={() => applyPreset(preset.left, preset.right)}
+                disabled={isLoading}
+                title={`${preset.left} / ${preset.right}`}
+              >
+                {`${preset.label}(${BOM_DATASETS[preset.left].length.toLocaleString()} 行)`}
+              </button>
+            ))}
+          </span>
           <label className="demo-toggle">
             <input
               type="checkbox"
@@ -284,7 +317,7 @@ export default function App() {
           </p>
         ) : (
           <p className="demo-summary">
-            品番を入力して「展開」を押してください(登録済み: A1000 / A1000-R2 / X9000。未登録の品番は空になります)。
+            {`品番を入力して「展開」を押すか、プリセットを選んでください(登録済み: ${BOM_ITEM_CODES.join(' / ')}。未登録の品番は空になります)。`}
           </p>
         )}
       </header>
