@@ -4,7 +4,7 @@
 > `view/*.tsx`)から手で起こした公開 API のスナップショットです。**型を変更したら本ファイルも同期してください。**
 > spreadsheet-grid 側の props / 型は [spreadsheet-grid の API_REFERENCE](https://github.com/ishibashi0112/datasheet-grid/blob/main/src/components/spreadsheet-grid/API_REFERENCE.md) を参照。
 
-最終更新: 2026-09-07(batch 18: ヘッドレス層 — `useComparisonPane` / `useComparisonScrollSync`。`ComparisonPane` / `ComparisonView` はその薄い包みに)。
+最終更新: 2026-09-07(batch 19: N 構成比較の純ロジック — `compareMany` / `alignComparisonRowsMany`。ペインの差分合成は 2-way / N 構成の両方の差分を受け付ける)。
 
 ## 設計の要点
 
@@ -95,6 +95,86 @@ type ComparisonLabels = {
 | --- | --- | --- |
 | `pairs` | `{ left: T; right: T }[]` | 突き合わせ順の対。**左の行順**を基準に対を作り、左と対にならなかった右行(right-only / キー重複の残り)を**右の行順**で末尾に並べる。キー重複で複数行が同じ相手を指す場合、相手は先に対になった行が消費する。 |
 | `placeholders` | `ComparisonPlaceholders<T>` = `{ left: ReadonlySet<T>; right: ReadonlySet<T> }` | 各側の配列に挿入されたプレースホルダ行の集合。プレースホルダは差分 Map に載らないため、ハイライト / 差分ラベルは自動的に対象外。 |
+
+## N 構成比較(基準対各構成。純ロジック)
+
+3・4 構成を比べるための層です。2-way の `compare()` / `ComparisonRowDiff` は変更せず、**基準(base)を 1 つ選び、他の各構成を基準と 2-way 比較する**意味論(git の base 比較と同じ)で上に載せています。基準以外のペインの行差分は「基準との 2-way 結果」そのもの、基準ペインの行差分は各構成との結果の集約です。React 層(`useMultiComparison`)と view 層(合成コンポーネント)は後続バッチで追加予定(`docs/DESIGN_NOTES.md` 6 章)。将来の「全構成一致判定」(`mode: 'all'`)も同じ `ComparisonMultiRowDiff` の形で表せるよう、`missingIn` / `counterparts` は構成 ID で引く形にしてあります。
+
+### `compareMany<T>(sides, options): ComparisonMultiResult<T>`
+
+| 引数 | 型 | 説明 |
+| --- | --- | --- |
+| `sides` | `readonly ComparisonSideInput<T>[]` | 構成の配列(入力順がペインの既定順)。`{ id, rows, label? }`。`id` は重複不可、`label` は表示名(既定 `id`)。 |
+| `options` | `CompareManyOptions<T>` | `CompareOptions<T>` から `formatDiffLabel` / `labels` を N 構成版に置き換えたもの + `baseId`(既定 `sides[0].id`)。 |
+
+計算量は構成数 k に対して `O(k × (基準の行数 + その構成の行数))`。空の `sides` / 重複 ID / 存在しない `baseId` は例外(日本語メッセージ)。
+
+### `CompareManyOptions<T>`
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `getMatchKey` / `compareFields` / `duplicateKeyPolicy` | (`CompareOptions<T>` と同じ) | | 各ペアの 2-way 比較にそのまま渡される。 |
+| `baseId` | `ComparisonSideId` | `sides[0].id` | 基準にする構成。 |
+| `formatDiffLabel` | `(ctx: MultiDiffLabelContext<T>) => string` | `formatDefaultMultiDiffLabel` | ラベル生成の差し替え(基準 / 他ペインの両方に使われる)。 |
+| `labels` | `Partial<ComparisonMultiLabels>` | `DEFAULT_COMPARISON_MULTI_LABELS` | 既定文言の部分上書き。 |
+
+### ラベル(N 構成)
+
+```ts
+type ComparisonMultiLabels = {
+  fieldDiffSeparator: string;  // '・'(2-way と共通)
+  fieldDiffSuffix: string;     // '違い'(2-way と共通)
+  baseOnly: string;            // '基準のみ'(基準ペインで、どの構成にも無い行)
+  sideOnly: string;            // 'この構成のみ'(他ペインで、基準に無い行)
+  missingInSide: string;       // '無し'(基準ペインの内訳: `案1: 無し`)
+  sideSeparator: string;       // ' / '(内訳の構成間区切り)
+  sideLabelSeparator: string;  // ': '(構成名と内訳の区切り)
+};
+```
+
+`formatDefaultMultiDiffLabel(ctx)`: 他ペインは 2-way と同じ(`only` → `sideOnly` / `field-diff` → `数量・支給区分違い` / `same` → `''`)。基準ペインは `only` → `baseOnly`、`partial` / `field-diff` → 構成ごとの内訳を入力順に連結(`案1: 数量違い / 案2: 無し`)。**基準以外が 1 構成だけのときは構成名の接頭辞を省く**ため、2 構成なら 2-way と同じ見た目(`数量違い` / `無し`)になります。
+
+`MultiDiffLabelContext<T>`: `{ sideId, isBase, kind, row, fieldDiffs, diffFields, missingIn, bySide, sides, labels }`。`sides` は全構成の `{ id, label, isBase }`(入力順)。
+
+### 結果(`ComparisonMultiResult<T>`)
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `baseId` | `ComparisonSideId` | 採用された基準。 |
+| `sides` | `readonly ComparisonMultiSideResult<T>[]` | 入力順の構成別結果(下記)。 |
+| `sidesById` | `ReadonlyMap<ComparisonSideId, ComparisonMultiSideResult<T>>` | ID 引き。 |
+| `pairs` | `ReadonlyMap<ComparisonSideId, ComparisonResult<T>>` | 基準以外の構成 ID → 基準との 2-way 結果(`left` = 基準、`right` = その構成。片側ラベルは `baseOnly` / `sideOnly` に置き換え済み)。 |
+| `hasAnyDiff` | `boolean` | いずれかの構成に `same` 以外の行があるか。 |
+
+`ComparisonMultiSideResult<T>` = `{ id, label, isBase, rows, annotated, diffs, summary, duplicateKeys }`。`rows` は入力と同一参照、`annotated` は入力順の `{ row, diff }`、`diffs` は `ReadonlyMap<T, ComparisonMultiRowDiff<T>>`、`summary` は `{ total, same, only, partial, fieldDiff }`(`partial` は基準ペイン以外では常に 0)、`duplicateKeys` はその構成内で重複した突き合わせキー。
+
+### `ComparisonMultiRowDiff<T>`
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `sideId` / `isBase` | `ComparisonSideId` / `boolean` | この差分が属する構成。 |
+| `kind` | `'same' \| 'only' \| 'partial' \| 'field-diff'` | `only` = 相手が無い(基準ペインではどの構成にも無い / 他ペインでは基準に無い)。`partial` = 基準ペインのみ。一部の構成に無いが、存在する構成とは一致。`field-diff` = いずれかの相手とフィールドが違う(基準ペインでは一部に無い場合も含む → `missingIn`)。優先順は field-diff > partial > only > same。 |
+| `label` | `string` | 表示用ラベル。`same` は `''`。 |
+| `matchKey` | `string` | 突き合わせキー。 |
+| `fieldDiffs` | `ReadonlySet<string>` | 差分のあった `CompareField.key`(基準ペインでは各構成との**和集合**)。 |
+| `missingIn` | `ReadonlySet<ComparisonSideId>` | 基準ペインで、この行が無い構成(他ペインでは常に空)。 |
+| `counterparts` | `ReadonlyMap<ComparisonSideId, T>` | 突き合わせ相手。基準ペインでは相手が居る構成ぶん、他ペインでは `baseId` の 1 件。 |
+| `bySide` | `ReadonlyMap<ComparisonSideId, ComparisonRowDiff<T>>` | 内訳。基準ペインでは構成 ID → 2-way 差分(基準側の注釈)、他ペインでは `baseId` → 2-way 差分(自側の注釈)。 |
+
+### `alignComparisonRowsMany<T>(result, options?): AlignComparisonRowsManyResult<T>`
+
+`compareMany()` の結果を「同じ行位置 = 同じ突き合わせ相手」になるよう構成ごとの配列へ並べ直し、欠損側へプレースホルダ行を挿入します(`alignComparisonRows` の N 構成版)。
+
+| 引数 | 型 | 説明 |
+| --- | --- | --- |
+| `result` | `ComparisonMultiResult<T>` | `compareMany()` の結果。 |
+| `options.createPlaceholderRow` | `(sideId: ComparisonSideId) => T` | プレースホルダ行の生成(**呼び出しごとに新しいオブジェクト**)。既定 `{} as T`。 |
+
+戻り値 `{ rows, placeholders, rowCount }`: `rows` は `ReadonlyMap<ComparisonSideId, readonly T[]>`(Map の順序は構成の入力順。全配列が `rowCount` の長さ)、`placeholders` は構成 ID → その配列に挿入されたプレースホルダ行の集合。並び順は**基準の行順**を軸に対応行を同じ位置へ置き、基準に無い行は「構成の入力順 → その構成内の行順」で末尾に足します。同じキーを持つ他構成どうしの行は同じ行位置にまとめます(基準対各構成では比較されないが、目視で並ぶよう位置だけ揃える)。キー重複で複数の基準行が同じ相手を指す場合、相手は先に対になった行が消費します。2 構成では `alignComparisonRows` と同じ並びになります。
+
+### ペインの差分合成との関係
+
+`composeColumns` / `composeRowClassName` / `insertDiffLabelColumn`(`useComparisonPane` の内部)は `ComparisonAnyDiffMap<T>` = `ReadonlyMap<T, ComparisonRowDiff<T> | ComparisonMultiRowDiff<T>>` を受け付けます。判定は `kind` の文字列一致ではなく「相手が無いか」(`hasMissingCounterpart`: `left-only` / `right-only` / `only` / `partial`、または `missingIn` が空でない)と「`fieldDiffs` に列があるか」で行うため、N 構成の差分でも同じクラスが付きます(行修飾子は `--only` / `--partial` が加わる)。
 
 ### `getComparisonExportData<T>(options): GridExportData`
 
@@ -434,8 +514,8 @@ const rightPane = useComparisonPane<Row>({ ..., gridProps: sync.rightGridProps }
 | `.cmpg-pane` / `.cmpg-pane--left` / `.cmpg-pane--right` | ペイン | 縦 flex。`data-cmpg-side` 属性も付く。 |
 | `.cmpg-pane-header` / `.cmpg-pane-body` | ペイン内 | ヘッダースロット / グリッド領域。 |
 | `.cmpg-grid` | グリッド root(`.ssg-root`) | 利用側 `className` と合成。差分ハイライトのトークンはここにも定義される(`useComparisonPane` のヘッドレス利用でラッパー `.cmpg-pane` が無くても効く)。 |
-| `.cmpg-row-diff` | 行コンテナ + 各データセル | `same` 以外の行。修飾子 `--left-only` / `--right-only` / `--field`。 |
-| `.cmpg-cell-diff` | セル | 強調セル共通。修飾子 `--key`(キー列 × 片側のみ行)/ `--field`(差分フィールド列 × field-diff 行)。 |
+| `.cmpg-row-diff` | 行コンテナ + 各データセル | `same` 以外の行。修飾子 `--left-only` / `--right-only` / `--field`(2-way)、`--only` / `--partial` / `--field`(N 構成)。 |
+| `.cmpg-cell-diff` | セル | 強調セル共通。修飾子 `--key`(キー列 × 相手の無い行)/ `--field`(差分フィールド列 × `fieldDiffs` にその列がある行)。 |
 | `.cmpg-row-placeholder` | 行コンテナ + 各データセル | alignRows で欠損側に入るプレースホルダ行。差分ハイライトとは独立で、`enableRowHighlight={false}` でも付与される。 |
 | `.cmpg-row-context` | 行コンテナ + 各データセル | 木モードの「差分のみ」で差分行の祖先として残る文脈行(`kind` は `same`)。差分ハイライトとは独立で、`enableRowHighlight={false}` でも付与される。 |
 | `.cmpg-row-rollup` | 行コンテナ + 各データセル | 木モードで、自身は `same` だが配下に差分がある行(ロールアップ)。差分ハイライトの一種で `enableRowHighlight` に従う。差分行クラスとは同時に付かない。 |
@@ -493,3 +573,5 @@ const rightPane = useComparisonPane<Row>({ ..., gridProps: sync.rightGridProps }
 階層比較(`buildComparisonTree` / `flattenComparisonTree` / `alignComparisonTree` / `useTreeComparison`)は batch 15、ロールアップ(`countDescendantDiffs` / `.cmpg-row-rollup` / 配下差分ラベル)は batch 16a、折りたたみ(`collapsedKeys` / `isCollapsed` / `collectCollapsedDescendants`)は batch 16b で追加。展開ボタンの UI は利用側の列で組む(README レシピ)。
 
 ヘッドレス層(`useComparisonPane` / `useComparisonScrollSync`)は batch 18(2026-09-07)で追加。`ComparisonPane` / `ComparisonView` の振る舞いは変えず、本体をフックへ移して薄い包みにした。
+
+N 構成比較(3・4 構成)は batch 19(2026-09-07)で純ロジック(`compareMany` / `alignComparisonRowsMany`)を追加。React 層(`useMultiComparison`)/ スクロール同期と差分ジャンプの N 対応 / 合成コンポーネント(`ComparisonRoot` / `ComparisonPane` / `ComparisonGrid`)/ 木モードの N 化は後続バッチ(`docs/DESIGN_NOTES.md` 6 章)。

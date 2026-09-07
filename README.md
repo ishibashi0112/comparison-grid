@@ -16,6 +16,7 @@ Side-by-side **two-list comparison** for **React 19**, built on top of [`@ishiba
 - **Four diff kinds** — `same` / `left-only` / `right-only` / `field-diff`, with a generated label (`"左のみ"`, `"数量・支給区分違い"`, …) that you can reword or replace.
 - **`useComparison()`** — derives `visibleLeft` / `visibleRight` (diff-only filter), `effectiveShowDiffOnly` (never `true` when one side is empty), `canShowDiffOnly` (for disabling the toggle), per-side counts and duplicate-key reports.
 - **Aligned mode (`alignRows`)** — both panes get the same length in match order, with placeholder rows (styled `.cmpg-row-placeholder`) inserted on the missing side; the diff-only filter works per pair so alignment is preserved.
+- **3+ configurations (`compareMany()` / `alignComparisonRowsMany()`)** — pick one side as the base and every other side is compared against it. Non-base rows carry the plain two-way diff; base rows aggregate it (`fieldDiffs` is the union, `missingIn` lists the sides that lack the row, `bySide` keeps the per-side detail) with labels like `案1: 数量違い / 案2: 無し`. Pure logic today; the React hook and the compound view components are the next batches.
 - **Hierarchical comparison (`useTreeComparison()`)** — for BOM-like trees. Build a tree from flat rows (`buildComparisonTree`: depth-first + level, or adjacency list), and the library derives **path keys** (`B2002/C3001`) so the same part under a different parent never pairs; representative-code substitution propagates to descendants; sibling duplicates get an occurrence suffix; broken input is reported as `issues`, never repaired. Aligned mode becomes a structural merge (right-only subtrees land next to their siblings) and the diff-only filter keeps ancestors as dimmed context rows. Unchanged parents with changes below get a `.cmpg-row-rollup` tint and a `配下に差分 n 件` label in the diff-label column (`getDescendantDiffCount(row)` for your own columns). Collapse subtrees with `collapsedKeys` — a `Set` of path keys, so one key folds the pair on both panes.
 - **Scroll sync (`enableScrollSync`)** — keeps both panes' scroll in lockstep (user scrolls propagate, API-driven ones are ignored to prevent loops). Pairs naturally with `alignRows`. Which axes sync follows the layout: side-by-side syncs vertical only; stacked (`layout='vertical'`) syncs both axes so the columns stay aligned too.
 - **Export (`getComparisonExportData()`)** — one side's rows + diff label column in the same `{ columns, rows: { value, text }[][] }` shape as the grid's `getExportData()`, so downstream CSV/Excel code can be shared.
@@ -164,6 +165,25 @@ result.annotatedLeft;     // { row, diff }[] in input order
 result.leftDiffs.get(row); // ComparisonRowDiff | undefined (keyed by row object)
 result.summary.left;      // { total, same, only, fieldDiff }
 result.duplicateKeys;     // { left: string[], right: string[] }
+```
+
+Three or more sides: `compareMany` takes `{ id, rows, label? }[]`, compares every side against the base (the first one, or `baseId`), and `alignComparisonRowsMany` lines them up with placeholders:
+
+```ts
+import { compareMany, alignComparisonRowsMany } from '@ishibashi0112/comparison-grid';
+
+const multi = compareMany(
+  [
+    { id: 'base', rows: current, label: '現行' },
+    { id: 'a', rows: planA, label: '案1' },
+    { id: 'b', rows: planB, label: '案2' },
+  ],
+  { getMatchKey: (row) => row.id, compareFields: [{ key: 'qty', label: '数量' }] },
+);
+multi.sidesById.get('base')!.diffs.get(row); // { kind: 'same' | 'only' | 'partial' | 'field-diff', missingIn, fieldDiffs, bySide, label }
+multi.sidesById.get('a')!.summary;          // { total, same, only, partial, fieldDiff }
+const aligned = alignComparisonRowsMany(multi);
+aligned.rows.get('a');                       // rows for side 'a', same length as every other side
 ```
 
 The view layer is headless too. `useComparisonPane` gives you everything `ComparisonPane` would wire into the grid, as props you spread yourself, and `useComparisonScrollSync` gives you the composed `ref` / `onScroll` for both sides. Use them when you want your own DOM, headers or layout:
@@ -337,6 +357,7 @@ MIT
 - **4 種類の差分** — `same` / `left-only` / `right-only` / `field-diff` と、生成ラベル(`"左のみ"`、`"数量・支給区分違い"` など)。文言の差し替え / 完全カスタムが可能。
 - **`useComparison()`** — `visibleLeft` / `visibleRight`(差分のみフィルタ)、`effectiveShowDiffOnly`(片側が空なら常に `false`)、`canShowDiffOnly`(トグルの無効化条件)、片側ごとの件数、キー重複の報告を導出します。
 - **左右整列モード(`alignRows`)** — 両ペインを突き合わせ順の同じ長さに揃え、欠損側へプレースホルダ行(`.cmpg-row-placeholder`)を挿入。「差分のみ」は対の単位でフィルタされ、整列が保たれます。
+- **3 構成以上の比較(`compareMany()` / `alignComparisonRowsMany()`)** — 1 つを基準にして他の各構成を基準と比較します。基準以外の行は素の 2-way 差分、基準の行はその集約(`fieldDiffs` は和集合、`missingIn` に「無い構成」、`bySide` に構成別の内訳)で、ラベルは `案1: 数量違い / 案2: 無し` のようになります。現時点は純ロジックのみで、React フックと合成コンポーネント版の view は後続バッチです。
 - **階層比較(`useTreeComparison()`)** — 部品表のような木構造向け。平坦な行から木を組み立て(`buildComparisonTree`: 深さ優先順 + level、または隣接リスト)、ライブラリが**パスキー**(`B2002/C3001`)を導出するので、別の親の下の同じ品番が突き合うことがありません。代表品番の置き換えは子孫へ伝播、兄弟の重複には出現番号、入力の破綻は修復せず `issues` で報告。整列モードは構造マージ(右のみサブツリーが兄弟の位置に入る)になり、「差分のみ」では祖先が薄い文脈行として残ります。自身は同一でも配下に差分がある親には `.cmpg-row-rollup` の淡い色と、差分ラベル列に `配下に差分 n 件` が出ます(自作列には `getDescendantDiffCount(row)`)。サブツリーの折りたたみは `collapsedKeys`(パスキーの `Set`。1 つのキーで両ペインの対が畳まれます)。
 - **スクロール同期(`enableScrollSync`)** — 両ペインのスクロールを同期(ユーザー操作のみ伝播し、API 由来は無視してループを防止)。`alignRows` との併用を想定。同期する軸はレイアウトに追従: 横並びは縦のみ、縦並び(`layout='vertical'`)は列も上下に揃うため縦横両方。
 - **エクスポート(`getComparisonExportData()`)** — 片側の行 + 差分ラベル列を、本体の `getExportData()` と同形(`{ columns, rows: { value, text }[][] }`)で返します。CSV / Excel 出力の下流処理を共用できます。
@@ -485,6 +506,25 @@ result.annotatedLeft;      // 入力順の { row, diff }[]
 result.leftDiffs.get(row); // ComparisonRowDiff | undefined(行オブジェクトで引く)
 result.summary.left;       // { total, same, only, fieldDiff }
 result.duplicateKeys;      // { left: string[], right: string[] }
+```
+
+3 構成以上は `compareMany` に `{ id, rows, label? }[]` を渡します。基準(先頭、または `baseId`)と各構成を比較し、`alignComparisonRowsMany` でプレースホルダ付きに整列できます:
+
+```ts
+import { compareMany, alignComparisonRowsMany } from '@ishibashi0112/comparison-grid';
+
+const multi = compareMany(
+  [
+    { id: 'base', rows: current, label: '現行' },
+    { id: 'a', rows: planA, label: '案1' },
+    { id: 'b', rows: planB, label: '案2' },
+  ],
+  { getMatchKey: (row) => row.id, compareFields: [{ key: 'qty', label: '数量' }] },
+);
+multi.sidesById.get('base')!.diffs.get(row); // { kind: 'same' | 'only' | 'partial' | 'field-diff', missingIn, fieldDiffs, bySide, label }
+multi.sidesById.get('a')!.summary;          // { total, same, only, partial, fieldDiff }
+const aligned = alignComparisonRowsMany(multi);
+aligned.rows.get('a');                       // 構成 'a' の行。全構成が同じ長さ
 ```
 
 View 層も headless です。`useComparisonPane` は `ComparisonPane` がグリッドへ配線するものすべてを「自分でスプレッドする props」として返し、`useComparisonScrollSync` は両側ぶんの合成済み `ref` / `onScroll` を返します。DOM / ヘッダー / 配置を自分で決めたいときに使います:

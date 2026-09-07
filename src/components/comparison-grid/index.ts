@@ -7,6 +7,13 @@ export {
   DEFAULT_COMPARISON_LABELS,
 } from './logic/compare';
 export { alignComparisonRows } from './logic/alignRows';
+// N 構成比較(基準対各構成)。2-way の上に載る別レイヤー。
+export {
+  compareMany,
+  formatDefaultMultiDiffLabel,
+  DEFAULT_COMPARISON_MULTI_LABELS,
+} from './logic/compareMany';
+export { alignComparisonRowsMany } from './logic/alignRowsMany';
 export { getComparisonExportData } from './logic/exportData';
 // 階層比較(木): 平坦な行 → 木 / 木 → キー付き平坦化 / 構造マージ整列。
 export {
@@ -54,6 +61,23 @@ export type {
   ComparisonPlaceholders,
   AlignComparisonRowsOptions,
   AlignComparisonRowsResult,
+  ComparisonSideId,
+  ComparisonSideInput,
+  ComparisonSideInfo,
+  ComparisonMultiDiffKind,
+  ComparisonMultiRowDiff,
+  ComparisonMultiRow,
+  ComparisonMultiDiffMap,
+  ComparisonMultiLabels,
+  MultiDiffLabelContext,
+  CompareManyOptions,
+  ComparisonMultiSideSummary,
+  ComparisonMultiSideResult,
+  ComparisonMultiResult,
+  AlignComparisonRowsManyOptions,
+  AlignComparisonRowsManyResult,
+  ComparisonAnyRowDiff,
+  ComparisonAnyDiffMap,
   ComparisonExportOptions,
   ComparisonTreeNode,
   BuildComparisonTreeByLevelOptions,

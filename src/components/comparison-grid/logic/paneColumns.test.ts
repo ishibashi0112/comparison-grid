@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import type { GridColumn, RowStyleContext } from '@ishibashi0112/spreadsheet-grid';
 import { compare } from './compare';
+import { compareMany } from './compareMany';
 import {
   CMPG_CLASS_NAMES,
   DEFAULT_DIFF_LABEL_COLUMN_KEY,
@@ -9,6 +10,7 @@ import {
   composeRowClassName,
   getDiffCellClassName,
   getDiffRowClassName,
+  hasMissingCounterpart,
   insertDiffLabelColumn,
 } from './paneColumns';
 import type { CompareField, GridCellStyleContext } from '../model/types';
@@ -271,5 +273,79 @@ describe('insertDiffLabelColumn', () => {
       pinned: 'right',
     });
     expect(custom[4]).toMatchObject({ key: 'diffLabel', title: '変更箇所', width: 200, pinned: 'right' });
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// N 構成(compareMany)の差分でも同じ合成が効く。
+// ---------------------------------------------------------------------------------------------
+describe('N 構成の差分(ComparisonMultiRowDiff)', () => {
+  // base: A(same) / B(qty 違い) / C(partial: a に無い) / D(only)。a: A / B / E(only)。b: A / B / C。
+  const mBase = [row('A', 1), row('B', 1), row('C', 1), row('D', 1)];
+  const mA = [row('A', 1), row('B', 2), row('E', 1)];
+  const mB = [row('A', 1), row('B', 1), row('C', 1)];
+  const multi = compareMany(
+    [
+      { id: 'base', rows: mBase },
+      { id: 'a', rows: mA },
+      { id: 'b', rows: mB },
+    ],
+    { getMatchKey: (r) => r.id, compareFields },
+  );
+  const baseDiffs = multi.sidesById.get('base')!.diffs;
+  const aDiffs = multi.sidesById.get('a')!.diffs;
+
+  it('行クラスは kind ごとの修飾子(--field / --partial / --only)が付く', () => {
+    expect(getDiffRowClassName(baseDiffs.get(mBase[0]))).toBeUndefined();
+    expect(getDiffRowClassName(baseDiffs.get(mBase[1]))).toBe('cmpg-row-diff cmpg-row-diff--field');
+    expect(getDiffRowClassName(baseDiffs.get(mBase[2]))).toBe('cmpg-row-diff cmpg-row-diff--partial');
+    expect(getDiffRowClassName(baseDiffs.get(mBase[3]))).toBe('cmpg-row-diff cmpg-row-diff--only');
+    expect(getDiffRowClassName(aDiffs.get(mA[2]))).toBe('cmpg-row-diff cmpg-row-diff--only');
+    expect(CMPG_CLASS_NAMES.rowOnly).toBe('cmpg-row-diff--only');
+    expect(CMPG_CLASS_NAMES.rowPartial).toBe('cmpg-row-diff--partial');
+  });
+
+  it('キー列は相手の無い行(only / partial / missingIn 付き field-diff)で強調される', () => {
+    const composed = composeColumns(columns, baseDiffs, { compareFields, keyColumnKeys: ['id'] });
+    const idCol = composed[0];
+    expect(cellClass(idCol, mBase[0])).toBeUndefined();
+    expect(cellClass(idCol, mBase[1])).toBeUndefined();
+    expect(cellClass(idCol, mBase[2])).toBe('cmpg-cell-diff cmpg-cell-diff--key');
+    expect(cellClass(idCol, mBase[3])).toBe('cmpg-cell-diff cmpg-cell-diff--key');
+    expect(hasMissingCounterpart(baseDiffs.get(mBase[2])!)).toBe(true);
+    expect(hasMissingCounterpart(baseDiffs.get(mBase[1])!)).toBe(false);
+
+    // 一部に無く残りと違う行(field-diff + missingIn)はキー列と差分フィールド列の両方が強調される。
+    const mixed = compareMany(
+      [
+        { id: 'base', rows: [row('A', 1)] },
+        { id: 'a', rows: [] },
+        { id: 'b', rows: [row('A', 2)] },
+      ],
+      { getMatchKey: (r) => r.id, compareFields },
+    );
+    const mixedRow = mixed.sidesById.get('base')!.rows[0];
+    const mixedCols = composeColumns(columns, mixed.sidesById.get('base')!.diffs, {
+      compareFields,
+      keyColumnKeys: ['id'],
+    });
+    expect(cellClass(mixedCols[0], mixedRow)).toBe('cmpg-cell-diff cmpg-cell-diff--key');
+    expect(cellClass(mixedCols[1], mixedRow)).toBe('cmpg-cell-diff cmpg-cell-diff--field');
+  });
+
+  it('フィールド列は fieldDiffs(和集合)に含まれる列だけ強調される', () => {
+    const composed = composeColumns(columns, baseDiffs, { compareFields, keyColumnKeys: ['id'] });
+    expect(cellClass(composed[1], mBase[1])).toBe('cmpg-cell-diff cmpg-cell-diff--field');
+    expect(cellClass(composed[2], mBase[1])).toBeUndefined();
+    expect(cellClass(composed[1], mBase[2])).toBeUndefined();
+  });
+
+  it('差分ラベル列は N 構成のラベルを出す', () => {
+    const withLabel = insertDiffLabelColumn(columns, baseDiffs, undefined);
+    const labelCol = withLabel[withLabel.length - 1];
+    expect(labelCol.key).toBe(DEFAULT_DIFF_LABEL_COLUMN_KEY);
+    expect(labelCol.getValue?.(mBase[1])).toBe('a: 数量違い');
+    expect(labelCol.getValue?.(mBase[2])).toBe('a: 無し');
+    expect(labelCol.getValue?.(mBase[3])).toBe('基準のみ');
   });
 });

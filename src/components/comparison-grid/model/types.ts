@@ -547,3 +547,150 @@ export type UseTreeComparisonResult<T> = UseComparisonResult<T> & {
   /** その行が折りたたまれているか(collapsedKeys にその行の matchKey が含まれるか)。展開ボタンの表示に。 */
   isCollapsed: (row: T) => boolean;
 };
+
+// ---------------------------------------------------------------------------------------------
+// N 構成比較(基準対各構成)。2-way の compare() / ComparisonRowDiff は変更せず、その上に載る別レイヤーです。
+//   基準(base)を 1 つ選び、他の各構成を基準と 2-way 比較します(git の base 比較と同じ意味論)。
+//   基準以外のペインの行差分は「基準との 2-way 結果」そのもの、基準ペインの行差分は各構成との結果の集約です。
+//   将来の「全構成一致判定」(mode: 'all')も同じ ComparisonMultiRowDiff の形(missingIn / counterparts が
+//   構成 ID で引ける)で表せるようにしてあります。
+// ---------------------------------------------------------------------------------------------
+
+/** 構成(ペイン)の識別子。利用側が付ける任意の文字列(重複不可)。 */
+export type ComparisonSideId = string;
+
+/** N 構成比較の入力 1 構成ぶん。 */
+export type ComparisonSideInput<T> = {
+  id: ComparisonSideId;
+  rows: readonly T[];
+  /** 表示名(既定 id)。基準ペインの内訳ラベル(`案1: 数量違い`)に使う。 */
+  label?: string;
+};
+
+/** 構成の情報(入力順・基準フラグつき)。ラベル生成のコンテキストと結果に載る。 */
+export type ComparisonSideInfo = {
+  id: ComparisonSideId;
+  label: string;
+  isBase: boolean;
+};
+
+/** N 構成の行差分種別。
+ *  - `only`: 突き合わせ相手が無い(基準ペインではどの構成にも無い / 他ペインでは基準に無い)。
+ *  - `partial`: 基準ペインのみ。一部の構成に無いが、存在する構成とは一致。
+ *  - `field-diff`: いずれかの相手とフィールドが違う(基準ペインでは一部の構成に無い場合も含む。`missingIn` を参照)。 */
+export type ComparisonMultiDiffKind = 'same' | 'only' | 'partial' | 'field-diff';
+
+/** N 構成比較の 1 行ぶんの差分情報。 */
+export type ComparisonMultiRowDiff<T> = {
+  /** この差分が属する構成。 */
+  sideId: ComparisonSideId;
+  isBase: boolean;
+  kind: ComparisonMultiDiffKind;
+  /** 表示用ラベル。same は ''。 */
+  label: string;
+  matchKey: string;
+  /** 差分のあった CompareField.key(基準ペインでは各構成との和集合)。 */
+  fieldDiffs: ReadonlySet<string>;
+  /** 基準ペインで、この行が無い構成の ID(他ペインでは常に空)。 */
+  missingIn: ReadonlySet<ComparisonSideId>;
+  /** 突き合わせ相手(構成 ID → 行)。基準ペインでは相手が居る構成ぶん、他ペインでは基準(キー baseId)のみ。 */
+  counterparts: ReadonlyMap<ComparisonSideId, T>;
+  /** 内訳: 基準ペインでは構成 ID → 基準とその構成の 2-way 差分(基準側の注釈)、
+   *  他ペインでは baseId → 基準との 2-way 差分(自側の注釈)の 1 件。 */
+  bySide: ReadonlyMap<ComparisonSideId, ComparisonRowDiff<T>>;
+};
+
+export type ComparisonMultiRow<T> = {
+  row: T;
+  diff: ComparisonMultiRowDiff<T>;
+};
+
+export type ComparisonMultiDiffMap<T> = ReadonlyMap<T, ComparisonMultiRowDiff<T>>;
+
+/** N 構成比較の既定文言。fieldDiffSeparator / fieldDiffSuffix は 2-way と共通。 */
+export type ComparisonMultiLabels = Pick<ComparisonLabels, 'fieldDiffSeparator' | 'fieldDiffSuffix'> & {
+  /** 基準ペインで、どの構成にも無い行。 */
+  baseOnly: string;
+  /** 基準以外のペインで、基準に無い行。 */
+  sideOnly: string;
+  /** 基準ペインの内訳で「その構成に無い」を表す語(`案1: 無し`)。 */
+  missingInSide: string;
+  /** 基準ペインの内訳を構成ごとに連結する区切り。 */
+  sideSeparator: string;
+  /** 構成の表示名と内訳の間の区切り。 */
+  sideLabelSeparator: string;
+};
+
+/** N 構成比較の formatDiffLabel へ渡すコンテキスト。 */
+export type MultiDiffLabelContext<T> = {
+  sideId: ComparisonSideId;
+  isBase: boolean;
+  kind: ComparisonMultiDiffKind;
+  row: T;
+  fieldDiffs: ReadonlySet<string>;
+  /** 差分のあったフィールド(compareFields の順。基準ペインでは和集合)。 */
+  diffFields: readonly CompareField<T>[];
+  missingIn: ReadonlySet<ComparisonSideId>;
+  bySide: ReadonlyMap<ComparisonSideId, ComparisonRowDiff<T>>;
+  /** 全構成の情報(入力順)。 */
+  sides: readonly ComparisonSideInfo[];
+  labels: ComparisonMultiLabels;
+};
+
+/** compareMany() のオプション。CompareOptions と同じ突き合わせ設定 + 基準の指定。 */
+export type CompareManyOptions<T> = Omit<CompareOptions<T>, 'formatDiffLabel' | 'labels'> & {
+  /** 基準にする構成の ID(既定は sides[0].id)。 */
+  baseId?: ComparisonSideId;
+  formatDiffLabel?: (ctx: MultiDiffLabelContext<T>) => string;
+  labels?: Partial<ComparisonMultiLabels>;
+};
+
+export type ComparisonMultiSideSummary = {
+  total: number;
+  same: number;
+  only: number;
+  partial: number;
+  fieldDiff: number;
+};
+
+/** compareMany() の 1 構成ぶんの結果。 */
+export type ComparisonMultiSideResult<T> = ComparisonSideInfo & {
+  /** 入力の rows(同一参照)。 */
+  rows: readonly T[];
+  /** 入力順の { row, diff }。 */
+  annotated: ComparisonMultiRow<T>[];
+  diffs: ComparisonMultiDiffMap<T>;
+  summary: ComparisonMultiSideSummary;
+  /** この構成内で重複した突き合わせキー。 */
+  duplicateKeys: readonly string[];
+};
+
+/** compareMany() の戻り値。 */
+export type ComparisonMultiResult<T> = {
+  baseId: ComparisonSideId;
+  /** 入力順の構成別結果。 */
+  sides: readonly ComparisonMultiSideResult<T>[];
+  sidesById: ReadonlyMap<ComparisonSideId, ComparisonMultiSideResult<T>>;
+  /** 基準以外の構成 ID → 基準との 2-way 結果(left = 基準、right = その構成)。 */
+  pairs: ReadonlyMap<ComparisonSideId, ComparisonResult<T>>;
+  /** いずれかの構成に same 以外の行があるか。 */
+  hasAnyDiff: boolean;
+};
+
+export type AlignComparisonRowsManyOptions<T> = {
+  /** プレースホルダ行の生成(構成 ID を受け取る)。**呼び出しごとに新しいオブジェクト**を返すこと。既定は `{} as T`。 */
+  createPlaceholderRow?: (sideId: ComparisonSideId) => T;
+};
+
+/** alignComparisonRowsMany() の戻り値。全構成の配列は同じ長さ(rowCount)になる。 */
+export type AlignComparisonRowsManyResult<T> = {
+  /** 構成 ID → 整列済み行(プレースホルダ行を含む)。Map の順序は構成の入力順。 */
+  rows: ReadonlyMap<ComparisonSideId, readonly T[]>;
+  /** 構成 ID → その配列に挿入されたプレースホルダ行の集合。 */
+  placeholders: ReadonlyMap<ComparisonSideId, ReadonlySet<T>>;
+  rowCount: number;
+};
+
+/** ペインの差分合成(paneColumns / useComparisonPane)が受け付ける差分の形(2-way / N 構成のどちらでも)。 */
+export type ComparisonAnyRowDiff<T> = ComparisonRowDiff<T> | ComparisonMultiRowDiff<T>;
+export type ComparisonAnyDiffMap<T> = ReadonlyMap<T, ComparisonAnyRowDiff<T>>;

@@ -130,7 +130,17 @@
 - 引き継ぎ書と ss2602 の repomix は UTF-8 → Latin-1 の文字化け状態で受領したが内容は復元済み。Web 版へ持ち込む際は UTF-8 保存を確認。
 - パッケージ名 `@ishibashi0112/comparison-grid` は npm 未使用(2026-08-29 時点)。`package.json` の `repository` URL は `ishibashi0112/comparison-grid` を仮置き(リポジトリ作成後に確定)。
 
-## 6. 検討中(2026-09-07。未実装 — 次セッションの起点)
+### 実装済み(2026-09-07・batch 19。N 構成比較の純ロジック `compareMany` / `alignComparisonRowsMany`)
+
+- **決定(ユーザー確認済み)**: 意味論は (A) 基準対各構成。(B) 全構成一致判定は将来実装する前提で捨てない → `ComparisonMultiRowDiff` の `missingIn` / `counterparts` / `bySide` を構成 ID で引く形にし、(B) を `mode: 'all'` として同じ型で表せるようにした(未実装)。合成版 `ComparisonPane` の名前は推奨案(既存を据え置き、合成版は名前空間側)。木モードの N 化は後回し。
+- **2-way API は無変更。** `compare()` / `ComparisonRowDiff` / `alignComparisonRows` はそのまま。N 構成は `compareMany()` が構成ごとに `compare(基準, 構成)` を呼び(`pairs`)、基準ペインの行だけ集約する。基準の索引は構成ごとに作り直すが k は高々数個。
+- **kind の 4 値**: `same` / `only`(相手が無い)/ `partial`(基準のみ。一部に無いが存在する構成とは一致)/ `field-diff`(いずれかと違う。一部に無い場合も含み `missingIn` を参照)。優先順は field-diff > partial > only > same。「一部に無く残りと違う」を 1 つの kind にせず、sets(`missingIn` / `fieldDiffs`)を正とし kind は行スタイル用の要約とした。
+- **既定ラベル**: 基準ペインは構成別内訳を入力順に連結(`案1: 数量違い / 案2: 無し`)。基準以外が 1 構成だけなら接頭辞を省き 2-way と同じ見た目にする(2 構成を N API で使っても違和感が無いように)。2-way 側の pair ラベルは `baseOnly` / `sideOnly` に差し替えて呼ぶ。
+- **`paneColumns` の一般化**: 判定を `kind` の文字列一致から「相手が無いか」(`hasMissingCounterpart`)と「`fieldDiffs` に列があるか」に変更し、`ComparisonAnyDiffMap<T>`(2-way / N 構成の Union)を受ける。既存テストの期待値は不変。行修飾子 `--only` / `--partial` を追加(CSS は `.cmpg-row-diff` 基底で色が付くため追加スタイル無し)。
+- **整列**: 基準の行順を軸に対応行を同じ位置へ、基準に無い行は「構成順 → 行順」で末尾。基準に無い同キーの行は他構成どうしで同じ行位置にまとめる(比較はしないが目視で並ぶ)。2 構成では `alignComparisonRows` と同じ並び(テストで確認)。
+- 公開: `compareMany` / `formatDefaultMultiDiffLabel` / `DEFAULT_COMPARISON_MULTI_LABELS` / `alignComparisonRowsMany` + 型 17 個。テスト 186(+28)。
+
+## 6. 検討中(2026-09-07。batch 19 で 6-3 の 1 を実装済み — 次は 2 以降)
 
 ### 6-1. N 構成比較(3・4 構成へ拡張)
 
@@ -209,11 +219,11 @@ HeroUI の `Dropdown.Trigger / .Popover / .Menu / .Item` の形は **Compound Co
 
 ### 6-3. 実装バッチ案(1 バッチ = 1 コミット)
 
-1. `logic/compareMany.ts` + `logic/alignRowsMany.ts`(純ロジック + 単体テスト)。`paneColumns` の判定一般化。
+1. ~~`logic/compareMany.ts` + `logic/alignRowsMany.ts`(純ロジック + 単体テスト)。`paneColumns` の判定一般化。~~ **batch 19 で実装済み。**
 2. `hooks/useMultiComparison.ts`(参照安定化 / 差分のみ / 整列の導出)。
 3. `useComparisonScrollSync` の N 対応(2-way API 互換)+ `useComparisonNavigation` の N 版。
 4. 合成コンポーネント(Root / Pane / PaneHeader / Grid)+ `ComparisonView` の再実装(既存テスト全緑)。
 5. デモ: 3 構成プリセット(現行 + 案 1 + 案 2)。
 6. 木モードの N 化(必要になったら)。
 
-**未決(ユーザー確認待ち)**: 意味論 (A)/(B)、合成版 `ComparisonPane` の名前の扱い、木モードの優先度。
+**決定済み(2026-09-07)**: 意味論は (A)。(B) は将来実装(捨てない)。合成版 `ComparisonPane` の名前は推奨案。木モードの N 化は後回し。
