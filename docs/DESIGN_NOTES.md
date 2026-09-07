@@ -129,3 +129,91 @@
 - spreadsheet-grid: `~/dev/datasheet-grid`(GitHub `ishibashi0112/datasheet-grid`)。v0.29.0 = 2026-08-29 の提案対応リリース(「proposals batch 1〜6」)。2026-09-07 時点の npm latest は v0.32.0(0.30: タッチ対応 / 0.31: 展開行 `detailRow` / 0.32: 行ドラッグ `enableRowDrag`。0.29.1 以降は公開 API の削除・改名なし)で、本リポジトリの devDependency を 0.32.0 に上げて全ゲート緑を確認済み。peer は `>=0.29.1 <1.0.0` のまま(新機能を使っていないため)。ss2602 は `^0.16.0` 固定なので、ライブラリ導入時に 0.29 系へ上げる必要がある(0.17〜0.28 で export scope の改名や既定値変更あり)。
 - 引き継ぎ書と ss2602 の repomix は UTF-8 → Latin-1 の文字化け状態で受領したが内容は復元済み。Web 版へ持ち込む際は UTF-8 保存を確認。
 - パッケージ名 `@ishibashi0112/comparison-grid` は npm 未使用(2026-08-29 時点)。`package.json` の `repository` URL は `ishibashi0112/comparison-grid` を仮置き(リポジトリ作成後に確定)。
+
+## 6. 検討中(2026-09-07。未実装 — 次セッションの起点)
+
+### 6-1. N 構成比較(3・4 構成へ拡張)
+
+**意味論の選択肢**(ここが最初の決定事項)
+
+| 案 | 内容 | 長所 | 短所 |
+| --- | --- | --- | --- |
+| (A) 基準対各構成 | 1 つを基準(base)にし、他の各構成を基準と 2-way 比較する(git の base 比較と同じ) | 「基準のみ / この構成のみ / ○○違い」の意味・CSS・ラベルをそのまま流用できる。`compare()` を変更せず再利用できる | 基準以外同士の差(案 1 と案 2 の違い)は直接は出ない |
+| (B) 全構成一致判定 | 行キーごとに全構成の値を集め、全一致なら same、1 つでも欠損 / 不一致なら差分 | 対称で「基準」を選ばなくてよい | 差分の意味が「どれと違うか」を失うため、ラベル / 強調の内訳表示を別途設計する必要がある。純ロジックを新規に書く |
+
+**推奨: (A)。** 部品構成比較の実務は「現行(基準)に対して案 1・案 2…」の形が自然で、(B) が必要になっても (A) の結果から導出できる(基準の全ペアが same ⇔ 全一致)。(B) は `mode` オプションで後付け可能な形にしておく。**既存の 2-way API(0.4.0)は変更せず、N 構成は上に載る別レイヤーとして足す**(`ComparisonSide = 'left' | 'right'` や `leftDiffs / rightDiffs` はそのまま)。
+
+**データ層の API 案**
+
+```ts
+type ComparisonSideInput<T> = { id: string; rows: readonly T[] };
+
+useMultiComparison<T>({
+  sides: readonly ComparisonSideInput<T>[]; // 並び順 = ペインの既定順
+  baseId?: string;                          // 既定は sides[0].id
+  // 以下は CompareOptions / UseComparisonOptions と同じ
+  getMatchKey; compareFields; labels?; formatDiffLabel?; duplicateKeyPolicy?;
+  showDiffOnly?; alignRows?; createPlaceholderRow?;
+}) => {
+  baseId: string;
+  sides: readonly ComparisonSideResult<T>[];       // { id, isBase, visibleRows, diffs, placeholderRows, summary }
+  getSide(id): ComparisonSideResult<T> | undefined;
+  pairs: ReadonlyMap<string, ComparisonResult<T>>;  // 構成 id → 基準との 2-way 結果(内訳)
+  hasAllSides / hasAnyDiff / effectiveShowDiffOnly / canShowDiffOnly;
+  getDiff(row): ComparisonMultiRowDiff<T> | undefined; // どの側の行でも引ける
+}
+```
+
+- **差分型 `ComparisonMultiRowDiff<T>`**: `{ sideId; kind: 'same' | 'only' | 'field-diff'; fieldDiffs; missingIn: ReadonlySet<sideId>; counterparts: ReadonlyMap<sideId, T>; bySide?: ReadonlyMap<sideId, ComparisonRowDiff<T>>; label; matchKey }`。
+  - 基準以外のペインの行: 基準との 2-way 結果そのもの(`only` = 基準に無い、`field-diff` = 基準と違う)。
+  - 基準ペインの行: 各構成との結果の**集約**。全構成に無ければ `only`、全構成と一致すれば `same`、それ以外は `field-diff`(`fieldDiffs` は和集合、`missingIn` に「一部の構成に無い」を持つ)。内訳は `bySide` と、ラベル(既定 `案1: 数量違い / 案2: 無し` のような構成別連結)で出す。
+  - `paneColumns` の判定は `kind` の文字列一致(`left-only` 等)ではなく「相手が無いか」「`fieldDiffs` に列があるか」で行うよう一般化し、2-way / N-way 両方の diff を受け付ける(CSS クラスは `.cmpg-row-diff--only` を追加。既存 `--left-only / --right-only` は据え置き)。
+- **整列 `alignComparisonRowsMany`**: 基準の行順を軸に、各構成の対応行を同じ行位置へ置く(欠損側はプレースホルダ)。基準に無い行は「構成の順 → その構成内の行順」で末尾に足す。返り値は `rows: ReadonlyMap<sideId, T[]>` + `placeholders: ReadonlyMap<sideId, ReadonlySet<T>>`。「差分のみ」は行位置単位で「いずれかの側に差分があれば残す」。
+- **スクロール同期**: `useComparisonScrollSync` を N 対応に拡張(`sides: Record<sideId, ComparisonGridProps<T>>` → 同じ形で返す。発火側以外の全ハンドルへ `setScrollPosition`)。既存の `leftGridProps / rightGridProps` 形は内部で N 版へ委譲して据え置く。
+- **差分ジャンプ**: `useComparisonNavigation` の N 版(停止位置は整列時は行位置、非整列時は matchKey 単位。ref は側ごと)。
+- **木モード**: `alignComparisonTree` の N 構造マージが必要になるため後回し(平坦の N 構成を先に出す)。
+
+### 6-2. 合成コンポーネント(Compound Components)による view 層の分解
+
+HeroUI の `Dropdown.Trigger / .Popover / .Menu / .Item` の形は **Compound Components(合成コンポーネント)パターン**: 親が Context で状態を配り、子は「役割(スロット)」を名乗るだけで、配置・階層・追加要素は利用側が JSX で自由に組む。HeroUI v3 は React Aria Components の上に載り、React Aria 自体が「hooks(ヘッドレス)+ 合成コンポーネント」の 2 層になっている。本ライブラリは batch 18 で「純ロジック → フック(ヘッドレス)→ コンポーネント」の 3 層になっており、合成コンポーネントは **第 3 層の `ComparisonView`(固定レイアウト)を分解するもの**。ヘッドレス層の代替ではなく補完。
+
+**API 案**
+
+```tsx
+<ComparisonRoot comparison={multi} columns={columns} keyColumnKeys={['itemCode']} enableScrollSync>
+  <ComparisonPane side="base">
+    <ComparisonPaneHeader>現行</ComparisonPaneHeader>
+    <ComparisonGrid gridProps={{ height: 480 }} />
+  </ComparisonPane>
+  <ComparisonPane side="planA">…</ComparisonPane>
+  <ComparisonPane side="planB">…</ComparisonPane>
+</ComparisonRoot>
+```
+
+- `ComparisonRoot`: Context に comparison(2-way / N-way どちらも受ける)/ columns / ハイライトオプション / スクロール同期レジストリを置く。DOM は `.cmpg-view`(`layout` / `className` あり)。
+- `ComparisonPane`: side id を Context に置く `.cmpg-pane`。**既存の `ComparisonPane`(props 直渡し)とは別物になるため名前の扱いが論点**(案: 既存を据え置き、合成版は `Comparison.Pane` 名前空間側にだけ置く / または既存を「Root 配下では Context から補完」する形で統合)。
+- `ComparisonPaneHeader`: `.cmpg-pane-header` スロット。
+- `ComparisonGrid`: Context から side を取り `useComparisonPane` + 同期レジストリへの登録 → `<SpreadsheetGrid>`。
+- 任意: `ComparisonSummary` / `ComparisonNavButtons`(useComparisonNavigation の配線)。
+- `Comparison` 名前空間オブジェクト(`Comparison.Root` …)は便宜的に用意し、主は名前付き export(tree-shaking のため)。
+- `ComparisonView` は合成部品で書き直したプリセットにする(props と振る舞いは互換維持・既存テスト全緑が条件)。
+
+**N 構成との合流点**: ペインの数が「JSX の子の数」になるため、3・4 構成を API 上の数(`leftX / rightX / thirdX …`)として扱わずに済む。両テーマは別々に作らず、**データ層の N 化 → 合成コンポーネント → ComparisonView をその上で再実装**の順で進めるのが最短。
+
+**トレードオフ / 注意**
+
+- Context 依存(Root 外の Pane はエラー)。明示的に gridProps を渡すヘッドレス経路(`useComparisonPane` / `useComparisonScrollSync`)は残す。
+- `SpreadsheetGrid` は分解できないため粒度はペイン単位まで(HeroUI の Item 粒度は無い)。
+- ハンドル ref の Context 登録は ref callback / effect 内で行う(render 中の ref 書き込み禁止・eslint baseline 維持)。
+- HeroUI の `slot="keyboard"` に相当するスロット機構は今回不要。
+
+### 6-3. 実装バッチ案(1 バッチ = 1 コミット)
+
+1. `logic/compareMany.ts` + `logic/alignRowsMany.ts`(純ロジック + 単体テスト)。`paneColumns` の判定一般化。
+2. `hooks/useMultiComparison.ts`(参照安定化 / 差分のみ / 整列の導出)。
+3. `useComparisonScrollSync` の N 対応(2-way API 互換)+ `useComparisonNavigation` の N 版。
+4. 合成コンポーネント(Root / Pane / PaneHeader / Grid)+ `ComparisonView` の再実装(既存テスト全緑)。
+5. デモ: 3 構成プリセット(現行 + 案 1 + 案 2)。
+6. 木モードの N 化(必要になったら)。
+
+**未決(ユーザー確認待ち)**: 意味論 (A)/(B)、合成版 `ComparisonPane` の名前の扱い、木モードの優先度。
