@@ -1,17 +1,25 @@
-// 両ペインのスクロール同期(enableScrollSync)のヘッドレス実装です。
-//   両グリッドのハンドルをこのフック内の ref に閉じ込め、source が 'user' のスクロールだけを
-//   相手の setScrollPosition() へ伝えます('api' 由来は無視してループを防ぐ。
-//   spreadsheet-grid v0.29.0 のスクロール API)。syncHorizontal では top に加えて left も伝えます。
-//   利用側の ref / onScroll(leftGridProps 等)は合成してそのまま透過します。
-//   ref の参照はすべて ref callback / イベントハンドラ内で行い、render 中には触りません。
-//   ComparisonView はこのフックの利用側で、自前レイアウトでも同じ同期が使えます。
-import { useCallback, useMemo, useRef, type Ref, type RefCallback, type RefObject } from 'react';
+// スクロール同期(enableScrollSync)のヘッドレス実装です。
+//   - useComparisonScrollSyncGroup: 構成 ID ごとのハンドル登録 + 発火側以外への伝播(broadcast)を持つ
+//     共有オブジェクト。source が 'user' のスクロールだけを相手の setScrollPosition() へ伝えます
+//     ('api' 由来は無視してループを防ぐ。spreadsheet-grid v0.29.0 のスクロール API)。
+//     syncHorizontal では top に加えて left も伝えます。合成コンポーネントの Root はこれを Context で配ります。
+//   - useSyncedGridProps: 1 グリッドぶんの ref / onScroll を group と合成した grid props を返します。
+//   - useComparisonScrollSyncMany: 構成 ID → grid props のレコードをまとめて合成(N 構成のヘッドレス利用)。
+//   - useComparisonScrollSync: 2-way の便利版(left / right)。振る舞いは従来どおり。
+//   利用側の ref / onScroll は合成してそのまま透過します。ref の参照はすべて ref callback / イベントハンドラ
+//   内で行い、render 中には触りません。
+import { useCallback, useMemo, useRef, type Ref, type RefCallback } from 'react';
 import type {
   GridScrollEventParams,
   SpreadsheetGridHandle,
 } from '@ishibashi0112/spreadsheet-grid';
 import type {
   ComparisonGridProps,
+  ComparisonScrollSyncGroup,
+  ComparisonSideId,
+  UseComparisonScrollSyncGroupOptions,
+  UseComparisonScrollSyncManyOptions,
+  UseComparisonScrollSyncManyResult,
   UseComparisonScrollSyncOptions,
   UseComparisonScrollSyncResult,
 } from '../model/types';
@@ -30,66 +38,135 @@ const setRefValue = <V,>(ref: Ref<V> | undefined, value: V | null): (() => void)
 
 const EMPTY_GRID_PROPS: Readonly<Record<never, never>> = Object.freeze({});
 
-/** 片側ぶんの合成(ハンドル捕捉 ref + 相手へ伝える onScroll)。 */
-function useSyncedSide<T>(
-  ownHandleRef: RefObject<SpreadsheetGridHandle<T> | null>,
-  otherHandleRef: RefObject<SpreadsheetGridHandle<T> | null>,
+/** 構成 ID ごとのハンドル登録とスクロール伝播を持つ共有オブジェクトを返します。 */
+export function useComparisonScrollSyncGroup<T>(
+  options: UseComparisonScrollSyncGroupOptions = {},
+): ComparisonScrollSyncGroup<T> {
+  const { enabled = true, syncHorizontal = false } = options;
+  const handlesRef = useRef<Map<ComparisonSideId, SpreadsheetGridHandle<T>>>(new Map());
+
+  const register = useCallback((sideId: ComparisonSideId, handle: SpreadsheetGridHandle<T>) => {
+    handlesRef.current.set(sideId, handle);
+    return () => {
+      if (handlesRef.current.get(sideId) === handle) handlesRef.current.delete(sideId);
+    };
+  }, []);
+
+  const broadcast = useCallback(
+    (fromSideId: ComparisonSideId, params: GridScrollEventParams) => {
+      if (!enabled || params.source !== 'user') return;
+      const position = syncHorizontal
+        ? { top: params.top, left: params.left }
+        : { top: params.top };
+      for (const [sideId, handle] of handlesRef.current) {
+        if (sideId !== fromSideId) handle.setScrollPosition(position);
+      }
+    },
+    [enabled, syncHorizontal],
+  );
+
+  const getHandle = useCallback(
+    (sideId: ComparisonSideId) => handlesRef.current.get(sideId) ?? null,
+    [],
+  );
+
+  return useMemo(
+    () => ({ enabled, syncHorizontal, register, broadcast, getHandle }),
+    [enabled, syncHorizontal, register, broadcast, getHandle],
+  );
+}
+
+/** 1 グリッドぶんの ref / onScroll を合成した grid props を作ります(純関数。フック版は useSyncedGridProps)。 */
+export const composeSyncedGridProps = <T,>(
+  group: ComparisonScrollSyncGroup<T>,
+  sideId: ComparisonSideId,
   userProps: ComparisonGridProps<T> | undefined,
-  enabled: boolean,
-  syncHorizontal: boolean,
+): ComparisonGridProps<T> => {
+  const userRef = userProps?.ref;
+  const userOnScroll = userProps?.onScroll;
+  const ref: RefCallback<SpreadsheetGridHandle<T>> = (handle) => {
+    const unregister = handle ? group.register(sideId, handle) : undefined;
+    const cleanup = setRefValue(userRef, handle);
+    return () => {
+      unregister?.();
+      if (cleanup) cleanup();
+      else setRefValue(userRef, null);
+    };
+  };
+  const onScroll = (params: GridScrollEventParams) => {
+    group.broadcast(sideId, params);
+    userOnScroll?.(params);
+  };
+  return { ...userProps, ref, onScroll };
+};
+
+/** 1 グリッドぶんの合成(useCallback で ref / onScroll を安定化)。合成コンポーネントの Grid が使います。
+ *  group.enabled に依らずハンドルは登録される(差分ジャンプが getHandle で引けるように)。 */
+export function useSyncedGridProps<T>(
+  group: ComparisonScrollSyncGroup<T>,
+  sideId: ComparisonSideId,
+  userProps: ComparisonGridProps<T> | undefined,
 ): ComparisonGridProps<T> {
   const userRef = userProps?.ref;
   const userOnScroll = userProps?.onScroll;
 
-  const syncedRef = useCallback<RefCallback<SpreadsheetGridHandle<T>>>(
+  const ref = useCallback<RefCallback<SpreadsheetGridHandle<T>>>(
     (handle) => {
-      ownHandleRef.current = handle;
+      const unregister = handle ? group.register(sideId, handle) : undefined;
       const cleanup = setRefValue(userRef, handle);
       return () => {
-        ownHandleRef.current = null;
+        unregister?.();
         if (cleanup) cleanup();
         else setRefValue(userRef, null);
       };
     },
-    [ownHandleRef, userRef],
+    [group, sideId, userRef],
   );
 
-  const syncedOnScroll = useCallback(
+  const onScroll = useCallback(
     (params: GridScrollEventParams) => {
-      if (params.source === 'user') {
-        otherHandleRef.current?.setScrollPosition(
-          syncHorizontal ? { top: params.top, left: params.left } : { top: params.top },
-        );
-      }
+      group.broadcast(sideId, params);
       userOnScroll?.(params);
     },
-    [otherHandleRef, userOnScroll, syncHorizontal],
+    [group, sideId, userOnScroll],
   );
 
-  return useMemo(
-    () =>
-      enabled
-        ? { ...userProps, ref: syncedRef, onScroll: syncedOnScroll }
-        : (userProps ?? (EMPTY_GRID_PROPS as ComparisonGridProps<T>)),
-    [enabled, userProps, syncedRef, syncedOnScroll],
-  );
+  return useMemo(() => ({ ...userProps, ref, onScroll }), [userProps, ref, onScroll]);
 }
 
+/** 構成 ID → grid props のレコードをまとめて合成します(N 構成のヘッドレス利用)。 */
+export function useComparisonScrollSyncMany<T>(
+  options: UseComparisonScrollSyncManyOptions<T>,
+): UseComparisonScrollSyncManyResult<T> {
+  const { sides, enabled, syncHorizontal } = options;
+  const group = useComparisonScrollSyncGroup<T>({ enabled, syncHorizontal });
+  const composed = useMemo(() => {
+    const record: Record<ComparisonSideId, ComparisonGridProps<T>> = {};
+    for (const sideId of Object.keys(sides)) {
+      record[sideId] = composeSyncedGridProps(group, sideId, sides[sideId]);
+    }
+    return record;
+  }, [group, sides]);
+  return useMemo(() => ({ sides: composed, group }), [composed, group]);
+}
+
+/** 2-way の便利版。enabled=false では入力をそのまま返します(ref / onScroll を足さない)。 */
 export function useComparisonScrollSync<T>(
   options: UseComparisonScrollSyncOptions<T> = {},
 ): UseComparisonScrollSyncResult<T> {
   const { enabled = true, syncHorizontal = false, leftGridProps, rightGridProps } = options;
-  const leftHandleRef = useRef<SpreadsheetGridHandle<T> | null>(null);
-  const rightHandleRef = useRef<SpreadsheetGridHandle<T> | null>(null);
+  const group = useComparisonScrollSyncGroup<T>({ enabled, syncHorizontal });
+  const left = useSyncedGridProps(group, 'left', leftGridProps);
+  const right = useSyncedGridProps(group, 'right', rightGridProps);
 
-  const left = useSyncedSide(leftHandleRef, rightHandleRef, leftGridProps, enabled, syncHorizontal);
-  const right = useSyncedSide(
-    rightHandleRef,
-    leftHandleRef,
-    rightGridProps,
-    enabled,
-    syncHorizontal,
+  return useMemo(
+    () =>
+      enabled
+        ? { leftGridProps: left, rightGridProps: right }
+        : {
+            leftGridProps: leftGridProps ?? (EMPTY_GRID_PROPS as ComparisonGridProps<T>),
+            rightGridProps: rightGridProps ?? (EMPTY_GRID_PROPS as ComparisonGridProps<T>),
+          },
+    [enabled, left, right, leftGridProps, rightGridProps],
   );
-
-  return useMemo(() => ({ leftGridProps: left, rightGridProps: right }), [left, right]);
 }

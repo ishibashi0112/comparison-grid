@@ -4,7 +4,7 @@
 > `view/*.tsx`)から手で起こした公開 API のスナップショットです。**型を変更したら本ファイルも同期してください。**
 > spreadsheet-grid 側の props / 型は [spreadsheet-grid の API_REFERENCE](https://github.com/ishibashi0112/datasheet-grid/blob/main/src/components/spreadsheet-grid/API_REFERENCE.md) を参照。
 
-最終更新: 2026-09-07(batch 20: N 構成比較の React 接続 `useMultiComparison`。batch 19 で純ロジック `compareMany` / `alignComparisonRowsMany`)。
+最終更新: 2026-09-07(batch 21: スクロール同期と差分ジャンプの N 構成対応 — `useComparisonScrollSyncGroup` / `useComparisonScrollSyncMany` / `useSyncedGridProps` / `useMultiComparisonNavigation`。batch 19〜20 で `compareMany` / `alignComparisonRowsMany` / `useMultiComparison`)。
 
 ## 設計の要点
 
@@ -394,6 +394,21 @@ const navigation = useComparisonNavigation({ comparison, alignRows });
 
 **注意**: `scrollToRow` は view index を受け取るため、**グリッド側のソート / フィルター**(`enableSorting` / `enableColumnFilter` 等)を適用中は行位置がずれます。差分ジャンプは比較結果の並びのまま表示している画面で使ってください。
 
+### `useMultiComparisonNavigation<T>(options): UseMultiComparisonNavigationResult<T>`
+
+N 構成の差分ジャンプ(`useComparisonNavigation` の N 構成版)。
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `comparison` | `Pick<UseMultiComparisonResult<T>, 'sides' \| 'baseId'>` | (required) | `useMultiComparison` の戻り値。 |
+| `alignRows` | `boolean` | `false` | 整列モード利用時に `true`。停止は行位置順になり、行の無い構成も同じ行位置へスクロールする。 |
+| `align` | `ScrollAlign` | `'center'` | `scrollToRow` の align。 |
+| `getHandle` | `(sideId) => SpreadsheetGridHandle<T> \| null \| undefined` | — | ハンドルの取得先を差し替える(`useComparisonScrollSyncGroup` の `getHandle` を渡すと ref の配線が不要)。省略時は `refs`。 |
+
+戻り値: `refs`(構成 ID → `RefObject`。`gridProps={{ ref: navigation.getRef('a') }}` で配線。構成 ID の並びが変わらない限り安定)/ `getRef(id)` / `diffStops`(`ComparisonMultiDiffStop<T>` = `{ kind, indices: ReadonlyMap<sideId, number>, rows: ReadonlyMap<sideId, T> }`)/ `diffCount` / `activeDiffIndex` / `canNavigate` / `goToDiff(index)` / `goToNextDiff()` / `goToPreviousDiff()`。
+
+停止位置は**基準の行順**(`same` 以外の基準行。各構成の行位置は `counterparts` から引く)→ 基準に無い行を「構成の入力順 → 行順」で末尾(同じ突き合わせキーを持つ他構成の行は 1 つの停止にまとめる。`alignComparisonRowsMany` と同じ規則)。純ロジック部分は `collectMultiDiffStops(sides, baseId, alignRows)` として公開。
+
 ### `useManualRows<T>(options): UseManualRowsResult<T>`
 
 マニュアル入力ペイン(編集可能グリッド)用の行 state ヘルパー。**末尾空行の維持 / 変更時の正規化 / 送信時検証**を担います。`rows`(空行込み)を編集ペインへ、`dataRows`(空行除外)を `useComparison` の `left` / `right` へ渡します。
@@ -468,6 +483,23 @@ const rightPane = useComparisonPane<Row>({ ..., gridProps: sync.rightGridProps }
 | `leftGridProps` / `rightGridProps` | `ComparisonGridProps<T>` | — | 合成元。利用側の `ref`(オブジェクト / 関数 / cleanup を返す関数 ref)と `onScroll` はそのまま透過・合成される。 |
 
 戻り値 `{ leftGridProps, rightGridProps }`。`source: 'user'` のスクロールだけ相手の `setScrollPosition()` へ伝え、`'api'` 由来は無視してループを防ぎます(spreadsheet-grid v0.29.0 のスクロール API)。ハンドルの参照は ref callback / イベントハンドラ内でのみ行います。入力が同じなら参照は安定します。
+
+### N 構成のスクロール同期(`useComparisonScrollSyncGroup` / `useSyncedGridProps` / `useComparisonScrollSyncMany`)
+
+`useComparisonScrollSync` の内部を N 構成向けに公開したもの。2-way の `useComparisonScrollSync` はこれらの上に載っており、振る舞いは従来どおり。
+
+| API | 説明 |
+| --- | --- |
+| `useComparisonScrollSyncGroup<T>({ enabled?, syncHorizontal? })` | 構成 ID ごとのハンドル登録(`register(sideId, handle) → 解除関数`)と伝播(`broadcast(fromSideId, params)`: `source === 'user'` のとき発火側以外の全ハンドルへ `setScrollPosition`)を持つ共有オブジェクト `ComparisonScrollSyncGroup<T>` を返す。`enabled=false` でも**登録は行われ**(`getHandle(sideId)` が使える)、`broadcast` だけ止まる。参照は `enabled` / `syncHorizontal` が変わらない限り安定。合成コンポーネントの Root はこれを Context で配る。 |
+| `useSyncedGridProps<T>(group, sideId, userProps?)` | 1 グリッドぶんの `ref` / `onScroll` を group と合成した `ComparisonGridProps<T>`(利用側の `ref` / `onScroll` は透過)。 |
+| `useComparisonScrollSyncMany<T>({ sides, enabled?, syncHorizontal? })` | `sides: Record<sideId, ComparisonGridProps<T> \| undefined>` をまとめて合成し `{ sides: Record<sideId, ComparisonGridProps<T>>, group }` を返す。`sides` の参照が変わると全構成の `ref` / `onScroll` が作り直されるため `useMemo` で保持すること。純関数版 `composeSyncedGridProps(group, sideId, userProps)` も公開。 |
+
+```tsx
+const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows: true });
+const sync = useComparisonScrollSyncMany<Row>({ sides: useMemo(() => ({ base: undefined, a: undefined, b: undefined }), []) });
+const navigation = useMultiComparisonNavigation({ comparison: multi, alignRows: true, getHandle: sync.group.getHandle });
+// 各構成: useComparisonPane({ rows: side.visibleRows, diffs: side.diffs, placeholderRows: side.placeholderRows, gridProps: sync.sides[side.id], ... })
+```
 
 ### `ComparisonView<T extends object>`
 
@@ -600,4 +632,4 @@ const rightPane = useComparisonPane<Row>({ ..., gridProps: sync.rightGridProps }
 
 ヘッドレス層(`useComparisonPane` / `useComparisonScrollSync`)は batch 18(2026-09-07)で追加。`ComparisonPane` / `ComparisonView` の振る舞いは変えず、本体をフックへ移して薄い包みにした。
 
-N 構成比較(3・4 構成)は batch 19(2026-09-07)で純ロジック(`compareMany` / `alignComparisonRowsMany`)、batch 20 で React 接続(`useMultiComparison`)を追加。スクロール同期と差分ジャンプの N 対応 / 合成コンポーネント(`ComparisonRoot` / `ComparisonPane` / `ComparisonGrid`)/ 木モードの N 化は後続バッチ(`docs/DESIGN_NOTES.md` 6 章)。
+N 構成比較(3・4 構成)は batch 19(2026-09-07)で純ロジック(`compareMany` / `alignComparisonRowsMany`)、batch 20 で React 接続(`useMultiComparison`)、batch 21 でスクロール同期と差分ジャンプの N 対応(`useComparisonScrollSyncGroup` / `useComparisonScrollSyncMany` / `useMultiComparisonNavigation`)を追加。合成コンポーネント(`ComparisonRoot` / `ComparisonPane` / `ComparisonGrid`)/ 木モードの N 化は後続バッチ(`docs/DESIGN_NOTES.md` 6 章)。

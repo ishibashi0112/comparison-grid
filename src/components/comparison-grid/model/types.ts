@@ -6,6 +6,7 @@ import type { CSSProperties, ReactNode, RefObject } from 'react';
 import type {
   CellStyleContext,
   GridColumn,
+  GridScrollEventParams,
   ScrollAlign,
   SpreadsheetGridHandle,
   SpreadsheetGridProps,
@@ -731,4 +732,76 @@ export type UseMultiComparisonResult<T> = Omit<ComparisonMultiResult<T>, 'sides'
   getDiff: (row: T) => ComparisonMultiRowDiff<T> | undefined;
   /** 構成 ID 引き(sidesById.get と同じ)。 */
   getSide: (id: ComparisonSideId) => ComparisonMultiVisibleSide<T> | undefined;
+};
+
+// ---------------------------------------------------------------------------------------------
+// N 構成のスクロール同期 / 差分ジャンプ。
+// ---------------------------------------------------------------------------------------------
+
+/** 構成 ID ごとのグリッドハンドル登録 + スクロール伝播の共有オブジェクト(useComparisonScrollSyncGroup)。
+ *  合成コンポーネントの Root が Context で配るものと同じ。参照は enabled / syncHorizontal が変わらない限り安定。 */
+export type ComparisonScrollSyncGroup<T> = {
+  enabled: boolean;
+  syncHorizontal: boolean;
+  /** ハンドルを登録し、解除関数を返す(ref callback 内で呼ぶ)。enabled に依らず登録される。 */
+  register: (sideId: ComparisonSideId, handle: SpreadsheetGridHandle<T>) => () => void;
+  /** 発火側以外の全ハンドルへスクロール位置を伝える(source が 'user' のときだけ。enabled=false では何もしない)。 */
+  broadcast: (fromSideId: ComparisonSideId, params: GridScrollEventParams) => void;
+  /** 登録済みハンドル(命令的操作に。render 中は触らない)。 */
+  getHandle: (sideId: ComparisonSideId) => SpreadsheetGridHandle<T> | null;
+};
+
+export type UseComparisonScrollSyncGroupOptions = {
+  /** 同期の有効 / 無効(既定 true)。false でもハンドルの登録は行われる(broadcast だけ止まる)。 */
+  enabled?: boolean;
+  /** 縦(top)に加えて横(left)も同期する(既定 false)。 */
+  syncHorizontal?: boolean;
+};
+
+/** useComparisonScrollSyncMany のオプション。構成 ID → 合成元 grid props。 */
+export type UseComparisonScrollSyncManyOptions<T> = UseComparisonScrollSyncGroupOptions & {
+  /** 構成 ID → 合成元の grid props(利用側の ref / onScroll は合成して透過)。undefined の構成は空 props から合成。
+   *  このオブジェクトの参照が変わると全構成の ref / onScroll が作り直されるため、useMemo で保持すること。 */
+  sides: Readonly<Record<ComparisonSideId, ComparisonGridProps<T> | undefined>>;
+};
+
+export type UseComparisonScrollSyncManyResult<T> = {
+  /** 構成 ID → ref / onScroll を合成した grid props(useComparisonPane の gridProps へ)。 */
+  sides: Readonly<Record<ComparisonSideId, ComparisonGridProps<T>>>;
+  group: ComparisonScrollSyncGroup<T>;
+};
+
+/** N 構成の差分ジャンプの 1 停止位置。 */
+export type ComparisonMultiDiffStop<T> = {
+  /** 基準行の kind。基準に無い行(他構成のみ)の停止は 'only'。 */
+  kind: Exclude<ComparisonMultiDiffKind, 'same'>;
+  /** 構成 ID → その構成の visibleRows 上の行位置(この停止に行が無い構成は載らない)。 */
+  indices: ReadonlyMap<ComparisonSideId, number>;
+  rows: ReadonlyMap<ComparisonSideId, T>;
+};
+
+export type UseMultiComparisonNavigationOptions<T> = {
+  /** useMultiComparison の戻り値(sides / baseId を使用)。 */
+  comparison: Pick<UseMultiComparisonResult<T>, 'sides' | 'baseId'>;
+  /** alignRows 利用時に true。行の無い構成も同じ行位置へスクロールする。 */
+  alignRows?: boolean;
+  /** scrollToRow の align(既定 'center')。 */
+  align?: ScrollAlign;
+  /** ハンドルの取得先を差し替える(useComparisonScrollSyncGroup の getHandle など)。省略時は refs を使う。 */
+  getHandle?: (sideId: ComparisonSideId) => SpreadsheetGridHandle<T> | null | undefined;
+};
+
+export type UseMultiComparisonNavigationResult<T> = {
+  /** 構成 ID → グリッドへ `gridProps={{ ref }}` で渡す ref(構成 ID の並びが変わらない限り安定)。 */
+  refs: ReadonlyMap<ComparisonSideId, RefObject<SpreadsheetGridHandle<T> | null>>;
+  getRef: (sideId: ComparisonSideId) => RefObject<SpreadsheetGridHandle<T> | null> | undefined;
+  /** 停止位置(基準の行順 → 基準に無い行を構成順 → 行順で末尾。alignRows では行位置順)。 */
+  diffStops: readonly ComparisonMultiDiffStop<T>[];
+  diffCount: number;
+  /** 現在の停止位置(未移動は -1)。sides が変わるとリセットされる。 */
+  activeDiffIndex: number;
+  canNavigate: boolean;
+  goToDiff: (index: number) => void;
+  goToNextDiff: () => void;
+  goToPreviousDiff: () => void;
 };

@@ -148,7 +148,15 @@
 - 戻り値は `ComparisonMultiResult` の `sides` を `visibleRows` / `placeholderRows` 付きに差し替えた形(`ComparisonMultiVisibleSide`)。`useComparisonPane` にそのまま渡せる粒度。
 - テスト 194(+8)。
 
-## 6. 検討中(2026-09-07。batch 19〜20 で 6-3 の 1〜2 を実装済み — 次は 3 以降)
+### 実装済み(2026-09-07・batch 21。スクロール同期と差分ジャンプの N 構成対応)
+
+- **同期は「グループ」を中心に据えた**: `useComparisonScrollSyncGroup` が構成 ID → ハンドルの Map(ref 内)と `register` / `broadcast` / `getHandle` を持つ安定オブジェクトを返し、`useSyncedGridProps(group, sideId, userProps)` が 1 グリッドぶんの `ref` / `onScroll` を合成する。2-way の `useComparisonScrollSync` はこの 2 つの上に載せ替え(既存テスト全緑・振る舞い不変)。合成コンポーネント(次バッチ)の Root はこの group を Context で配り、Grid が `useSyncedGridProps` を呼ぶ想定。
+- **`enabled=false` でも登録は行う**(broadcast だけ止める)。差分ジャンプが同期 OFF でも `group.getHandle` でハンドルを引けるようにするため。2-way 便利版だけは従来どおり入力をそのまま返す(テストの同一性期待を維持)。
+- `useComparisonScrollSyncMany` はレコード `sides: Record<sideId, props>` を `useMemo` 内で純関数 `composeSyncedGridProps` により一括合成(構成数が可変なのでフックをループできない)。レコードの参照が変わると全構成の ref が作り直されるため `useMemo` 保持を要求(API_REFERENCE に明記)。
+- **差分ジャンプ `useMultiComparisonNavigation`**: 停止 = `{ kind, indices: Map<sideId, index>, rows }`。基準の行順 → 基準に無い行(構成順 → 行順、同キーは 1 停止にまとめる)。`alignRows` では行位置順に並べ、行の無い構成も同じ行位置へスクロール。ハンドルは `refs`(構成 ID の並びをキーに useMemo で生成した `{ current: null }`)か `getHandle` オプション(group と共用)から取る。純ロジック部分は `collectMultiDiffStops` として公開。
+- テスト 207(+13)。
+
+## 6. 検討中(2026-09-07。batch 19〜21 で 6-3 の 1〜3 を実装済み — 次は 4 の合成コンポーネント)
 
 ### 6-1. N 構成比較(3・4 構成へ拡張)
 
@@ -229,7 +237,7 @@ HeroUI の `Dropdown.Trigger / .Popover / .Menu / .Item` の形は **Compound Co
 
 1. ~~`logic/compareMany.ts` + `logic/alignRowsMany.ts`(純ロジック + 単体テスト)。`paneColumns` の判定一般化。~~ **batch 19 で実装済み。**
 2. ~~`hooks/useMultiComparison.ts`(参照安定化 / 差分のみ / 整列の導出)。~~ **batch 20 で実装済み。**
-3. `useComparisonScrollSync` の N 対応(2-way API 互換)+ `useComparisonNavigation` の N 版。
+3. ~~`useComparisonScrollSync` の N 対応(2-way API 互換)+ `useComparisonNavigation` の N 版。~~ **batch 21 で実装済み。**
 4. 合成コンポーネント(Root / Pane / PaneHeader / Grid)+ `ComparisonView` の再実装(既存テスト全緑)。
 5. デモ: 3 構成プリセット(現行 + 案 1 + 案 2)。
 6. 木モードの N 化(必要になったら)。
