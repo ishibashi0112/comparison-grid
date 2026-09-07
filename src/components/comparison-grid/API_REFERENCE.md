@@ -4,13 +4,14 @@
 > `view/*.tsx`)から手で起こした公開 API のスナップショットです。**型を変更したら本ファイルも同期してください。**
 > spreadsheet-grid 側の props / 型は [spreadsheet-grid の API_REFERENCE](https://github.com/ishibashi0112/datasheet-grid/blob/main/src/components/spreadsheet-grid/API_REFERENCE.md) を参照。
 
-最終更新: 2026-08-30(batch 15〜16: 階層比較 — 純ロジック + `useTreeComparison` + 文脈行 + ロールアップ + 折りたたみ)。
+最終更新: 2026-09-07(batch 18: ヘッドレス層 — `useComparisonPane` / `useComparisonScrollSync`。`ComparisonPane` / `ComparisonView` はその薄い包みに)。
 
 ## 設計の要点
 
 - **サイドカー方式**: 行 `T` には書き込まず、差分は `ReadonlyMap<T, ComparisonRowDiff<T>>` で行オブジェクトに紐づけます。グリッドへ渡すのは `T[]` そのものなので、`GridColumn<T>` / `SpreadsheetGridProps<T>` を `T` の型のまま書けます。
 - **判定と見た目の分離**: 判定(kind / fieldDiffs / label)は純ロジック `compare()`、見た目はクラス(`.cmpg-*`)と CSS トークン(`--cmpg-*`)で差し替えます。
 - **差分のみ表示は導出**: `effectiveShowDiffOnly = hasBothSides && showDiffOnly` を render 中に導出し、片側だけのデータでは自動的に無効になります(useEffect での state 同期はしません)。
+- **ヘッドレス層 → 薄い View**: ペインの差分合成は `useComparisonPane()`(`SpreadsheetGrid` へスプレッドできる `gridProps` を返す)、スクロール同期は `useComparisonScrollSync()`(`ref` / `onScroll` を合成した grid props を返す)がフックとして本体を持ち、`ComparisonPane` / `ComparisonView` はそれらにラッパー DOM を足しただけの便利品です。DOM 構造や配置を自分で決めたいときはフックだけを使い、自前の `SpreadsheetGrid` に同じ差分ハイライト / 同期を配線できます。
 
 ## 純ロジック(React 非依存)
 
@@ -312,6 +313,56 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 
 **注意**: `createRow` / `isEmptyRow` / `normalizeRow` / `validateRow` はコンポーネント外か `useCallback` で定義してください(インラインだと毎レンダー再導出)。
 
+### `useComparisonPane<T extends object>(options): UseComparisonPaneResult<T>`
+
+片側 1 ペインぶんの差分合成をヘッドレスに行います(`ComparisonPane` の本体)。DOM を持たず、`SpreadsheetGrid` へそのままスプレッドできる `gridProps` を返します。
+
+```tsx
+const pane = useComparisonPane<Row>({
+  rows: comparison.visibleLeft,
+  diffs: comparison.leftDiffs,
+  columns,
+  compareFields: comparison.compareFields,
+  keyColumnKeys: ['id'],
+  placeholderRows: comparison.placeholders.left,
+  gridProps: { theme: 'dark', getRowClassName: (r) => (r.flag ? 'mine' : undefined) },
+});
+<SpreadsheetGrid<Row> {...pane.gridProps} />;
+```
+
+`UseComparisonPaneOptions<T>` = `ComparisonPaneProps<T>` から `side` / `header` / `showHeader` / `className` / `style` を除いたもの(`rows` / `diffs` / `columns` / `compareFields` / `keyColumnKeys` / `placeholderRows` / `contextRows` / `descendantDiffCounts` / `gridProps` / `enable*` / `showDiffLabelColumn` / `diffLabelColumn`。各項目の意味は `ComparisonPane` を参照)。
+
+| 戻り値 | Type | Description |
+| --- | --- | --- |
+| `gridProps` | `ComparisonPaneGridProps<T>`(`ComparisonGridProps<T> & { rows; columns; className }`) | `SpreadsheetGrid` へそのままスプレッドできる props。オプションの `gridProps` を引き継ぎ、`rows` / `columns` / `getRowClassName` / `className`(`'cmpg-grid your-class'`)をライブラリが与える。入力が同じなら参照は安定(`columns` / `compareFields` / `keyColumnKeys` / `diffLabelColumn` は浅い構造比較)。 |
+| `columns` | `GridColumn<T>[]` | 差分クラスを合成した列(`showDiffLabelColumn` なら差分ラベル列を含む)。`gridProps.columns` と同じ参照。 |
+| `getRowClassName` | `SpreadsheetGridProps<T>['getRowClassName']` | ライブラリの行クラスと利用側 `getRowClassName` を合成した関数。付与するものが無ければ利用側のものをそのまま返す。 |
+| `getDiff` | `(row: T) => ComparisonRowDiff<T> \| undefined` | この側の差分を引く参照関数。`renderCell` 内で差分に応じた描画をするときに。 |
+
+差分ハイライトの CSS トークン(`--cmpg-*`)は `.cmpg-pane` に加えて `.cmpg-grid`(= `gridProps.className`)にも定義されているため、ラッパー無しでもハイライトが効きます。`.cmpg-colors-cvd` もグリッド root(またはその祖先)に付与できます。
+
+### `useComparisonScrollSync<T>(options?): UseComparisonScrollSyncResult<T>`
+
+両ペインのスクロール同期をヘッドレスに行います(`ComparisonView` の `enableScrollSync` の本体)。各側の `SpreadsheetGrid`(または `useComparisonPane` の `gridProps` の元)へ渡す `ref` / `onScroll` を合成した grid props を返します。
+
+```tsx
+const sync = useComparisonScrollSync<Row>({
+  syncHorizontal: stacked,
+  leftGridProps: { ref: navigation.leftRef },
+  rightGridProps: { ref: navigation.rightRef },
+});
+const leftPane = useComparisonPane<Row>({ ..., gridProps: sync.leftGridProps });
+const rightPane = useComparisonPane<Row>({ ..., gridProps: sync.rightGridProps });
+```
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `enabled` | `boolean` | `true` | `false` のときは `leftGridProps` / `rightGridProps` をそのまま返す(未指定なら空オブジェクト)。 |
+| `syncHorizontal` | `boolean` | `false` | 縦(`top`)に加えて横(`left`)も同期する。列が上下に揃う縦並びレイアウト向け(`ComparisonView` は `layout='vertical'` で `true`)。 |
+| `leftGridProps` / `rightGridProps` | `ComparisonGridProps<T>` | — | 合成元。利用側の `ref`(オブジェクト / 関数 / cleanup を返す関数 ref)と `onScroll` はそのまま透過・合成される。 |
+
+戻り値 `{ leftGridProps, rightGridProps }`。`source: 'user'` のスクロールだけ相手の `setScrollPosition()` へ伝え、`'api'` 由来は無視してループを防ぎます(spreadsheet-grid v0.29.0 のスクロール API)。ハンドルの参照は ref callback / イベントハンドラ内でのみ行います。入力が同じなら参照は安定します。
+
 ### `ComparisonView<T extends object>`
 
 2 ペイン + ヘッダースロットの CSS Grid レイアウトです。既定は左右 2 カラム(横並び)で、`layout='vertical'` で上下 2 行(縦並び)になります。
@@ -335,7 +386,7 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 
 ### `ComparisonPane<T extends object>`
 
-片側 1 ペイン。`ComparisonView` を使わず自分でレイアウトしたいときに使います。
+片側 1 ペイン。`ComparisonView` を使わず自分でレイアウトしたいときに使います。実体は `useComparisonPane(options)` + ラッパー DOM(`.cmpg-pane` / ヘッダースロット / `.cmpg-pane-body`)で、ラッパーも要らなければフックだけを使います。
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -356,7 +407,7 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 
 ### gridProps の透過(`ComparisonGridProps<T>`)
 
-`Omit<SpreadsheetGridProps<T>, 'rows' | 'columns' | 'dataSource'>`。
+`Omit<SpreadsheetGridProps<T>, 'rows' | 'columns' | 'dataSource'>`。合成の実体は `useComparisonPane` で、`ComparisonPane` / `ComparisonView` 経由でもフック直接でも同じ規則です。
 
 | prop | 扱い |
 | --- | --- |
@@ -382,7 +433,7 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 | `.cmpg-view` / `.cmpg-view--horizontal` / `.cmpg-view--vertical` | ルート | CSS Grid(横並び = 2 カラム / 縦並び = 1 カラム)。`layout` に応じた修飾子と `data-cmpg-layout` 属性が付く。 |
 | `.cmpg-pane` / `.cmpg-pane--left` / `.cmpg-pane--right` | ペイン | 縦 flex。`data-cmpg-side` 属性も付く。 |
 | `.cmpg-pane-header` / `.cmpg-pane-body` | ペイン内 | ヘッダースロット / グリッド領域。 |
-| `.cmpg-grid` | グリッド root(`.ssg-root`) | 利用側 `className` と合成。 |
+| `.cmpg-grid` | グリッド root(`.ssg-root`) | 利用側 `className` と合成。差分ハイライトのトークンはここにも定義される(`useComparisonPane` のヘッドレス利用でラッパー `.cmpg-pane` が無くても効く)。 |
 | `.cmpg-row-diff` | 行コンテナ + 各データセル | `same` 以外の行。修飾子 `--left-only` / `--right-only` / `--field`。 |
 | `.cmpg-cell-diff` | セル | 強調セル共通。修飾子 `--key`(キー列 × 片側のみ行)/ `--field`(差分フィールド列 × field-diff 行)。 |
 | `.cmpg-row-placeholder` | 行コンテナ + 各データセル | alignRows で欠損側に入るプレースホルダ行。差分ハイライトとは独立で、`enableRowHighlight={false}` でも付与される。 |
@@ -396,24 +447,24 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 | トークン | 定義場所 | 既定(light) | 既定(dark: `.ssg-theme-dark` 配下) |
 | --- | --- | --- | --- |
 | `--cmpg-view-gap` | `:where(.cmpg-view)` | `16px` | — |
-| `--cmpg-pane-header-min-height` | `:where(.cmpg-pane)` | `24px` | — |
-| `--cmpg-pane-header-gap-x` / `-gap-y` | `:where(.cmpg-pane)` | `16px` / `4px` | — |
-| `--cmpg-pane-header-margin-bottom` | `:where(.cmpg-pane)` | `4px` | — |
-| `--cmpg-diff-row-bg` | `:where(.cmpg-pane)` | `#fef9c3` | `rgba(250, 204, 21, 0.14)` |
-| `--cmpg-diff-row-hover-bg` | `:where(.cmpg-pane)` | `#fef08a` | `rgba(250, 204, 21, 0.22)` |
-| `--cmpg-diff-text` | `:where(.cmpg-pane)` | `#dc2626` | `#f87171` |
-| `--cmpg-diff-font-weight` | `:where(.cmpg-pane)` | `700` | — |
-| `--cmpg-placeholder-row-bg` | `:where(.cmpg-pane)` | `#f3f4f6` | `rgba(148, 163, 184, 0.1)` |
-| `--cmpg-placeholder-row-hover-bg` | `:where(.cmpg-pane)` | `#e5e7eb` | `rgba(148, 163, 184, 0.18)` |
-| `--cmpg-context-row-text` | `:where(.cmpg-pane)` | `#6b7280` | `#9ca3af` |
-| `--cmpg-rollup-row-bg` | `:where(.cmpg-pane)` | `#fefce8` | `rgba(250, 204, 21, 0.07)` |
-| `--cmpg-rollup-row-hover-bg` | `:where(.cmpg-pane)` | `#fef9c3` | `rgba(250, 204, 21, 0.12)` |
+| `--cmpg-pane-header-min-height` | `:where(.cmpg-pane, .cmpg-grid)` | `24px` | — |
+| `--cmpg-pane-header-gap-x` / `-gap-y` | `:where(.cmpg-pane, .cmpg-grid)` | `16px` / `4px` | — |
+| `--cmpg-pane-header-margin-bottom` | `:where(.cmpg-pane, .cmpg-grid)` | `4px` | — |
+| `--cmpg-diff-row-bg` | `:where(.cmpg-pane, .cmpg-grid)` | `#fef9c3` | `rgba(250, 204, 21, 0.14)` |
+| `--cmpg-diff-row-hover-bg` | `:where(.cmpg-pane, .cmpg-grid)` | `#fef08a` | `rgba(250, 204, 21, 0.22)` |
+| `--cmpg-diff-text` | `:where(.cmpg-pane, .cmpg-grid)` | `#dc2626` | `#f87171` |
+| `--cmpg-diff-font-weight` | `:where(.cmpg-pane, .cmpg-grid)` | `700` | — |
+| `--cmpg-placeholder-row-bg` | `:where(.cmpg-pane, .cmpg-grid)` | `#f3f4f6` | `rgba(148, 163, 184, 0.1)` |
+| `--cmpg-placeholder-row-hover-bg` | `:where(.cmpg-pane, .cmpg-grid)` | `#e5e7eb` | `rgba(148, 163, 184, 0.18)` |
+| `--cmpg-context-row-text` | `:where(.cmpg-pane, .cmpg-grid)` | `#6b7280` | `#9ca3af` |
+| `--cmpg-rollup-row-bg` | `:where(.cmpg-pane, .cmpg-grid)` | `#fefce8` | `rgba(250, 204, 21, 0.07)` |
+| `--cmpg-rollup-row-hover-bg` | `:where(.cmpg-pane, .cmpg-grid)` | `#fef9c3` | `rgba(250, 204, 21, 0.12)` |
 
-上書きは `.cmpg-pane { --cmpg-diff-row-bg: ... }`(light)/ `.cmpg-pane .ssg-theme-dark { ... }`(dark)。`:where()` 定義のため読み込み順に依らず勝ちます。
+上書きは `.cmpg-pane { --cmpg-diff-row-bg: ... }`(light)/ `.cmpg-pane .ssg-theme-dark { ... }`(dark)。ヘッドレス利用(ラッパー無し)では `.cmpg-grid { ... }` / `.cmpg-grid.ssg-theme-dark { ... }`。`:where()` 定義のため読み込み順に依らず勝ちます。
 
 ### 配色プリセット(`.cmpg-colors-cvd`)
 
-色覚多様性向けのオプトインプリセット。**利用側が** `.cmpg-view` / `.cmpg-pane`(または任意の祖先)へ `cmpg-colors-cvd` クラスを付与すると:
+色覚多様性向けのオプトインプリセット。**利用側が** `.cmpg-view` / `.cmpg-pane` / `.cmpg-grid`(または任意の祖先)へ `cmpg-colors-cvd` クラスを付与すると:
 
 - 差分行の黄系 → **青系**(light: blue-100 `#dbeafe` / hover blue-200)、強調文字の赤 → **橙系**(orange-800 `#9a3412`。白地でコントラスト比 約 7:1)。ダークは青 α / orange-300 に差し替え。ロールアップ行は blue-50 `#eff6ff` / hover blue-100。
 - 差分セル(`.cmpg-cell-diff`)に**下線**を追加(色に依らない手掛かり)。
@@ -440,3 +491,5 @@ const comparison = useComparison<Row>({ left: manual.dataRows, right, ... });
 初版時の候補はすべて実装済みです: 左右整列モード(`alignRows`)/ スクロール同期(`enableScrollSync`)/ エクスポート(`getComparisonExportData`)/ 差分ジャンプ(`useComparisonNavigation`)/ マニュアル入力(`useManualRows`)/ 色覚多様性プリセット(`.cmpg-colors-cvd`)。経緯と設計判断は `docs/DESIGN_NOTES.md` を参照。
 
 階層比較(`buildComparisonTree` / `flattenComparisonTree` / `alignComparisonTree` / `useTreeComparison`)は batch 15、ロールアップ(`countDescendantDiffs` / `.cmpg-row-rollup` / 配下差分ラベル)は batch 16a、折りたたみ(`collapsedKeys` / `isCollapsed` / `collectCollapsedDescendants`)は batch 16b で追加。展開ボタンの UI は利用側の列で組む(README レシピ)。
+
+ヘッドレス層(`useComparisonPane` / `useComparisonScrollSync`)は batch 18(2026-09-07)で追加。`ComparisonPane` / `ComparisonView` の振る舞いは変えず、本体をフックへ移して薄い包みにした。

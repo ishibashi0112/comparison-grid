@@ -29,6 +29,9 @@ export { useComparison } from './hooks/useComparison';
 export { useTreeComparison } from './hooks/useTreeComparison';
 export { useComparisonNavigation } from './hooks/useComparisonNavigation';
 export { useManualRows } from './hooks/useManualRows';
+// ヘッドレス層: ComparisonPane / ComparisonView の本体。自前の SpreadsheetGrid に差分合成 / スクロール同期を配線する。
+export { useComparisonPane } from './hooks/useComparisonPane';
+export { useComparisonScrollSync } from './hooks/useComparisonScrollSync';
 export { ComparisonPane } from './view/ComparisonPane';
 export { ComparisonView } from './view/ComparisonView';
 
@@ -79,7 +82,12 @@ export type {
   ComparisonHighlightOptions,
   DiffLabelColumnOptions,
   ComparisonDiffLabelColumnProps,
+  UseComparisonPaneOptions,
+  ComparisonPaneGridProps,
+  UseComparisonPaneResult,
   ComparisonPaneProps,
+  UseComparisonScrollSyncOptions,
+  UseComparisonScrollSyncResult,
   ComparisonViewModel,
   ComparisonViewLayout,
   ComparisonViewProps,

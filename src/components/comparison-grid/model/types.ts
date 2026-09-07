@@ -322,9 +322,10 @@ export type ComparisonExportOptions<T> = {
   descendantDiffCounts?: ReadonlyMap<T, number>;
 };
 
-export type ComparisonPaneProps<T extends object> = ComparisonHighlightOptions &
+/** useComparisonPane のオプション。ComparisonPane の props から見た目(side / header / className / style)を
+ *  除いたもので、「差分をどう合成するか」だけを受け取ります。 */
+export type UseComparisonPaneOptions<T extends object> = ComparisonHighlightOptions &
   ComparisonDiffLabelColumnProps<T> & {
-    side: ComparisonSide;
     rows: readonly T[];
     diffs: ComparisonDiffMap<T>;
     columns: readonly GridColumn<T>[];
@@ -339,13 +340,59 @@ export type ComparisonPaneProps<T extends object> = ComparisonHighlightOptions &
     /** この側のロールアップ(行 → 配下の差分行数)。自身が same で配下に差分がある行へ .cmpg-row-rollup を付与し、
      *  差分ラベル列に配下差分ラベルを出す。 */
     descendantDiffCounts?: ReadonlyMap<T, number>;
-    header?: ReactNode;
-    /** ヘッダースロットの描画。既定は header !== undefined。 */
-    showHeader?: boolean;
+    /** 合成元の grid props。getRowClassName / className はライブラリのものと合成し、それ以外は
+     *  返り値の gridProps へそのまま含める(rows / columns はライブラリが与える)。 */
     gridProps?: ComparisonGridProps<T>;
-    className?: string;
-    style?: CSSProperties;
   };
+
+/** useComparisonPane が返す、SpreadsheetGrid へそのままスプレッドできる props
+ *  (`<SpreadsheetGrid {...pane.gridProps} />`)。rows / columns / getRowClassName / className を
+ *  ライブラリが与え、残りはオプションの gridProps から引き継ぎます。 */
+export type ComparisonPaneGridProps<T extends object> = ComparisonGridProps<T> & {
+  rows: readonly T[];
+  columns: GridColumn<T>[];
+  /** `'cmpg-grid your-class'`。差分ハイライトの CSS トークンはこのクラス(と .cmpg-pane)に定義される。 */
+  className: string;
+};
+
+/** useComparisonPane の戻り値。gridProps をそのまま使うほか、columns / getRowClassName を個別に取り出して
+ *  自前の SpreadsheetGrid 呼び出しへ組み込むこともできます。 */
+export type UseComparisonPaneResult<T extends object> = {
+  gridProps: ComparisonPaneGridProps<T>;
+  /** 差分クラスを合成した列(showDiffLabelColumn なら差分ラベル列を含む)。 */
+  columns: GridColumn<T>[];
+  /** ライブラリの行クラスと利用側 getRowClassName を合成した関数(付与するものが無ければ利用側のもの)。 */
+  getRowClassName: SpreadsheetGridProps<T>['getRowClassName'];
+  /** この側の差分を引く参照関数(renderCell 内で差分に応じた描画をするときに)。 */
+  getDiff: (row: T) => ComparisonRowDiff<T> | undefined;
+};
+
+export type ComparisonPaneProps<T extends object> = UseComparisonPaneOptions<T> & {
+  side: ComparisonSide;
+  header?: ReactNode;
+  /** ヘッダースロットの描画。既定は header !== undefined。 */
+  showHeader?: boolean;
+  className?: string;
+  style?: CSSProperties;
+};
+
+/** useComparisonScrollSync のオプション。 */
+export type UseComparisonScrollSyncOptions<T> = {
+  /** 同期の有効 / 無効(既定 true)。false のときは leftGridProps / rightGridProps をそのまま返す。 */
+  enabled?: boolean;
+  /** 縦(top)に加えて横(left)も同期する(既定 false)。列が上下に揃う縦並びレイアウト向け。 */
+  syncHorizontal?: boolean;
+  /** 合成元の grid props(利用側の ref / onScroll はそのまま透過・合成される)。 */
+  leftGridProps?: ComparisonGridProps<T>;
+  rightGridProps?: ComparisonGridProps<T>;
+};
+
+/** useComparisonScrollSync の戻り値。各側の SpreadsheetGrid(または useComparisonPane の gridProps)へ渡す
+ *  ref / onScroll を合成した grid props。 */
+export type UseComparisonScrollSyncResult<T> = {
+  leftGridProps: ComparisonGridProps<T>;
+  rightGridProps: ComparisonGridProps<T>;
+};
 
 /** ComparisonView が useComparison / useTreeComparison の結果から使う部分。
  *  placeholders は alignRows 利用時、contextRows は木モードの「差分のみ」利用時のみ必要。 */

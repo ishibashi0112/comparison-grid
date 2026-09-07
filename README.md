@@ -22,6 +22,7 @@ Side-by-side **two-list comparison** for **React 19**, built on top of [`@ishiba
 - **Diff navigation (`useComparisonNavigation()`)** — next/previous-diff jumping that scrolls both panes to the matching pair (wraps around; understands `alignRows` placeholders).
 - **Manual input helper (`useManualRows()`)** — row state for an editable pane: keeps a trailing empty row, normalizes edits, validates on submit; `dataRows` (blanks excluded) feeds `useComparison`.
 - **`ComparisonView` / `ComparisonPane`** — two `SpreadsheetGrid`s with row highlight, key-column highlight for one-sided rows, field-cell highlight for differing values, and an optional auto-inserted diff-label column. You write plain `GridColumn<T>[]`; the library composes its classes with yours. Panes sit side by side by default, or stack top/bottom with `layout='vertical'` (left pane on top) — handy for wide tables.
+- **Headless view layer (`useComparisonPane()` / `useComparisonScrollSync()`)** — the panes and scroll sync are hooks first, components second. `useComparisonPane` returns `gridProps` you spread onto your own `SpreadsheetGrid` (composed columns, row classes, `getDiff`), and `useComparisonScrollSync` returns the composed `ref` / `onScroll` pair. `ComparisonPane` / `ComparisonView` are thin wrappers over them, so you can drop down a level whenever you need your own DOM or layout without losing any highlighting or sync.
 - **Every grid feature stays available** — `gridProps` passes `SpreadsheetGridProps<T>` through (sorting, filters, theme, density, context menu, imperative `ref`…). Only `rows` / `columns` / `dataSource` are reserved.
 - **Themeable** — colors and gaps are CSS custom properties (`--cmpg-*`) defined at zero specificity; a dark preset follows `theme="dark"` automatically, and an opt-in color-vision-deficiency preset (`.cmpg-colors-cvd`: blue/orange plus underlined diff cells) is included. Unlayered CSS plus a `style.layer.css` variant for Tailwind v4 cascade layers.
 - TypeScript-first, fully controlled.
@@ -164,6 +165,35 @@ result.leftDiffs.get(row); // ComparisonRowDiff | undefined (keyed by row object
 result.summary.left;      // { total, same, only, fieldDiff }
 result.duplicateKeys;     // { left: string[], right: string[] }
 ```
+
+The view layer is headless too. `useComparisonPane` gives you everything `ComparisonPane` would wire into the grid, as props you spread yourself, and `useComparisonScrollSync` gives you the composed `ref` / `onScroll` for both sides. Use them when you want your own DOM, headers or layout:
+
+```tsx
+import { SpreadsheetGrid } from '@ishibashi0112/spreadsheet-grid';
+import { useComparison, useComparisonPane, useComparisonScrollSync } from '@ishibashi0112/comparison-grid';
+
+const comparison = useComparison({ left, right, getMatchKey: (r) => r.id, compareFields, alignRows: true });
+const sync = useComparisonScrollSync<Row>();          // { leftGridProps, rightGridProps }
+const leftPane = useComparisonPane<Row>({
+  rows: comparison.visibleLeft,
+  diffs: comparison.leftDiffs,
+  columns,
+  compareFields: comparison.compareFields,
+  keyColumnKeys: ['id'],
+  placeholderRows: comparison.placeholders.left,
+  gridProps: { ...sync.leftGridProps, theme: 'dark' },
+});
+const rightPane = useComparisonPane<Row>({ /* same with the right side */ });
+
+<section className="my-layout">
+  <MyHeader side="left" />
+  <SpreadsheetGrid<Row> {...leftPane.gridProps} />
+  <MyHeader side="right" />
+  <SpreadsheetGrid<Row> {...rightPane.gridProps} />
+</section>;
+```
+
+`leftPane.gridProps.className` carries `cmpg-grid`, which also hosts the `--cmpg-*` tokens, so highlighting works without the `.cmpg-pane` wrapper. `leftPane.getDiff(row)` is handy inside your `renderCell`.
 
 ## Recipes
 
@@ -313,6 +343,7 @@ MIT
 - **差分ジャンプ(`useComparisonNavigation()`)** — 次 / 前の差分へ両ペインを対でスクロール(末尾からは先頭へラップ。`alignRows` のプレースホルダ位置も理解します)。
 - **マニュアル入力ヘルパー(`useManualRows()`)** — 編集可能ペイン用の行 state: 末尾空行の維持 / 変更時の正規化 / 送信時検証。空行を除いた `dataRows` を `useComparison` に渡します。
 - **`ComparisonView` / `ComparisonPane`** — 2 つの `SpreadsheetGrid` に、差分行ハイライト / 片側のみ行のキー列強調 / 差分フィールドセルの強調 / 差分ラベル列(任意)を配線。利用側は素の `GridColumn<T>[]` を書くだけで、ライブラリのクラスは利用側のクラスと合成されます。ペインは既定で左右に並び、`layout='vertical'` で上下(left が上)に積めます — 列数の多い表に便利。
+- **ヘッドレスな View 層(`useComparisonPane()` / `useComparisonScrollSync()`)** — ペインとスクロール同期はフックが本体で、コンポーネントは便利品。`useComparisonPane` は自前の `SpreadsheetGrid` にスプレッドできる `gridProps`(合成済みの列 / 行クラス / `getDiff`)を返し、`useComparisonScrollSync` は合成済みの `ref` / `onScroll` を返します。`ComparisonPane` / `ComparisonView` はその薄い包みなので、DOM や配置を自分で決めたくなったらハイライトも同期も失わずに一段降りられます。
 - **グリッドの全機能をそのまま利用可** — `gridProps` で `SpreadsheetGridProps<T>` を透過(ソート / フィルター / テーマ / 密度 / コンテキストメニュー / 命令的 `ref` …)。予約するのは `rows` / `columns` / `dataSource` だけ。
 - **テーマ対応** — 色と余白は特異度 0 で定義した CSS 変数(`--cmpg-*`)。`theme="dark"` に自動追従するダークプリセットに加え、色覚多様性向けのオプトインプリセット(`.cmpg-colors-cvd`: 青 / 橙系 + 差分セル下線)付き。未レイヤー CSS と、Tailwind v4 向けの `style.layer.css` の二本立て。
 - TypeScript ファースト、完全 controlled。
@@ -455,6 +486,35 @@ result.leftDiffs.get(row); // ComparisonRowDiff | undefined(行オブジェク�
 result.summary.left;       // { total, same, only, fieldDiff }
 result.duplicateKeys;      // { left: string[], right: string[] }
 ```
+
+View 層も headless です。`useComparisonPane` は `ComparisonPane` がグリッドへ配線するものすべてを「自分でスプレッドする props」として返し、`useComparisonScrollSync` は両側ぶんの合成済み `ref` / `onScroll` を返します。DOM / ヘッダー / 配置を自分で決めたいときに使います:
+
+```tsx
+import { SpreadsheetGrid } from '@ishibashi0112/spreadsheet-grid';
+import { useComparison, useComparisonPane, useComparisonScrollSync } from '@ishibashi0112/comparison-grid';
+
+const comparison = useComparison({ left, right, getMatchKey: (r) => r.id, compareFields, alignRows: true });
+const sync = useComparisonScrollSync<Row>();          // { leftGridProps, rightGridProps }
+const leftPane = useComparisonPane<Row>({
+  rows: comparison.visibleLeft,
+  diffs: comparison.leftDiffs,
+  columns,
+  compareFields: comparison.compareFields,
+  keyColumnKeys: ['id'],
+  placeholderRows: comparison.placeholders.left,
+  gridProps: { ...sync.leftGridProps, theme: 'dark' },
+});
+const rightPane = useComparisonPane<Row>({ /* 右側も同様 */ });
+
+<section className="my-layout">
+  <MyHeader side="left" />
+  <SpreadsheetGrid<Row> {...leftPane.gridProps} />
+  <MyHeader side="right" />
+  <SpreadsheetGrid<Row> {...rightPane.gridProps} />
+</section>;
+```
+
+`leftPane.gridProps.className` には `cmpg-grid` が含まれ、`--cmpg-*` トークンはそこにも定義されているので、`.cmpg-pane` ラッパー無しでもハイライトが効きます。`renderCell` の中では `leftPane.getDiff(row)` で差分を引けます。
 
 ### レシピ
 

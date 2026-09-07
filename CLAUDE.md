@@ -6,7 +6,7 @@
 
 - React 19 / TypeScript 6 / Vite 8。ツールチェーンは vite+(`vp` コマンド)。pnpm 11.12.0(`packageManager` で固定)。
 - Vitest 4(`pnpm-workspace.yaml` の overrides で vp 同梱バージョンへ pin)。jsdom は `.test.tsx` のみ(先頭 docblock `// @vitest-environment jsdom`)。
-- peer: `react` / `react-dom` `^19`、`@ishibashi0112/spreadsheet-grid` `>=0.29.1 <1.0.0`(0.x で minor が頻繁に上がるため `^` を使わない。0.29.1 = pointerdown の `focus({ preventScroll })` 修正)。
+- peer: `react` / `react-dom` `^19`、`@ishibashi0112/spreadsheet-grid` `>=0.29.1 <1.0.0`(0.x で minor が頻繁に上がるため `^` を使わない。0.29.1 = pointerdown の `focus({ preventScroll })` 修正)。devDependency は 0.32.0(2026-09-07 時点の npm latest。0.29.1 以降は追加のみ)。
 - 構成は spreadsheet-grid リポジトリ(`~/dev/datasheet-grid`)を踏襲: ライブラリ本体は `src/components/comparison-grid/`、ルートは playground デモ(`src/App.tsx`)、配布物は `vite.lib.config.ts` + `tsconfig.lib.json` で `dist/` に生成。
 
 ## 厳守事項
@@ -55,8 +55,10 @@ src/components/comparison-grid/
   hooks/useTreeComparison.ts 階層比較(木)の React 接続: キー導出 / 構造整列 / 祖先を残す「差分のみ」(contextRows)
   hooks/useComparisonNavigation.ts 差分ジャンプ(次 / 前の差分行へスクロール)
   hooks/useManualRows.ts  マニュアル入力(末尾空行維持 / 正規化 / 送信時検証)
-  view/ComparisonPane.tsx 片側 1 ペイン(SpreadsheetGrid ラッパー)
-  view/ComparisonView.tsx 2 ペインレイアウト + スクロール同期(enableScrollSync)
+  hooks/useComparisonPane.ts ヘッドレス層: ペインの差分合成(SpreadsheetGrid へスプレッドできる gridProps を返す。ComparisonPane の本体)
+  hooks/useComparisonScrollSync.ts ヘッドレス層: スクロール同期(ref / onScroll を合成した grid props を返す。ComparisonView の enableScrollSync の本体)
+  view/ComparisonPane.tsx 片側 1 ペイン(useComparisonPane + ラッパー DOM の薄い包み)
+  view/ComparisonView.tsx 2 ペインレイアウト(useComparisonScrollSync を配線)
   styles.css            .cmpg-* クラス + --cmpg-* トークン(未レイヤー / :where)
   index.ts              公開バレル
 src/App.tsx / src/demo/  ss2602(部品構成比較)再現デモ

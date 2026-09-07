@@ -117,6 +117,15 @@
 - **スクロール同期の軸はレイアウトに追従。** 横並びは従来どおり縦(top)のみ(列幅・横スクロールはペインごとに独立)。縦並びは縦横(top / left)両方 — 列が上下に揃うため横同期が「行が左右に揃うから縦同期」の対応物になり、縦同期も alignRows 併用時に両ペインが同じ行窓を映す用途で残す。軸選択の独立オプションは足さない(必要になったら `onScroll` / `ref` の透過で利用側実装が可能)。
 - デモ(App.tsx)に「縦並び」トグルを追加。
 
-- spreadsheet-grid: `~/dev/datasheet-grid`(GitHub `ishibashi0112/datasheet-grid`)。v0.29.0 = npm latest(2026-08-29・提案対応リリース「proposals batch 1〜6」)。ss2602 は `^0.16.0` 固定なので、ライブラリ導入時に 0.29 系へ上げる必要がある(0.17〜0.28 で export scope の改名や既定値変更あり)。
+### 実装済み(2026-09-07・batch 18。ヘッドレス層 `useComparisonPane` / `useComparisonScrollSync`)
+
+- **動機**: 実務メニューへの採用にあたり「View の DOM / 配置がライブラリ固定で、微調整のたびにライブラリ改修になるのでは」という懸念に応える。差分判定(`compare` / `alignComparisonRows`)はもともとヘッドレスだったが、「差分をグリッドへどう配線するか」(列 / 行クラスの合成)と「スクロール同期」は `ComparisonPane` / `ComparisonView` のコンポーネント内に閉じていた。
+- **`useComparisonPane(options)`**: `ComparisonPane` の本体をフックに移し、`SpreadsheetGrid` へそのままスプレッドできる `gridProps`(`rows` / 合成済み `columns` / 合成済み `getRowClassName` / `'cmpg-grid …'` の `className` + 利用側 `gridProps` の残り)と、`columns` / `getRowClassName` / `getDiff` を返す。`ComparisonPane` はラッパー DOM(`.cmpg-pane` / ヘッダースロット)を足すだけの薄い包みに。TanStack Table などと同じ「フックが本体、コンポーネントは便利品」の形。
+- **`useComparisonScrollSync(options)`**: `ComparisonView` 内部の `useScrollSyncGridProps` を公開フックに昇格。`{ enabled, syncHorizontal, leftGridProps, rightGridProps }` を受けて合成済みの `{ leftGridProps, rightGridProps }` を返す。`ComparisonView` はこれの利用側になった。片側ぶんの合成を `useSyncedSide` に括り出し、左右で同じコードを共有。
+- **CSS**: `--cmpg-*` トークンを `:where(.cmpg-pane)` に加えて `:where(.cmpg-grid)`(グリッド root)にも定義。`.cmpg-grid` と `.ssg-theme-dark` は同じ root 要素に付くため、ダークは `.cmpg-grid.ssg-theme-dark` で切り替わる。これによりラッパー無しのヘッドレス利用でもハイライトが効く(`.cmpg-colors-cvd` も同様に root へ付与可)。
+- **API を足したのは 2 フック + 型 5 つのみ。** `ComparisonPane` / `ComparisonView` の props と振る舞いは変えていない(既存テスト全緑のまま)。`ComparisonPaneProps` は `UseComparisonPaneOptions & { side; header; showHeader; className; style }` に再定義した(内容は同じ)。
+- 見送り: `renderCell` の引数に差分を注入すること(spreadsheet-grid の `renderCell` シグネチャは変えられない。`getDiff` をクロージャで使えば足りる)。クラス名の合成規則そのものの差し替えポイント(必要になったら `useComparisonPane` にオプションを足す形で後付け可)。
+
+- spreadsheet-grid: `~/dev/datasheet-grid`(GitHub `ishibashi0112/datasheet-grid`)。v0.29.0 = 2026-08-29 の提案対応リリース(「proposals batch 1〜6」)。2026-09-07 時点の npm latest は v0.32.0(0.30: タッチ対応 / 0.31: 展開行 `detailRow` / 0.32: 行ドラッグ `enableRowDrag`。0.29.1 以降は公開 API の削除・改名なし)で、本リポジトリの devDependency を 0.32.0 に上げて全ゲート緑を確認済み。peer は `>=0.29.1 <1.0.0` のまま(新機能を使っていないため)。ss2602 は `^0.16.0` 固定なので、ライブラリ導入時に 0.29 系へ上げる必要がある(0.17〜0.28 で export scope の改名や既定値変更あり)。
 - 引き継ぎ書と ss2602 の repomix は UTF-8 → Latin-1 の文字化け状態で受領したが内容は復元済み。Web 版へ持ち込む際は UTF-8 保存を確認。
 - パッケージ名 `@ishibashi0112/comparison-grid` は npm 未使用(2026-08-29 時点)。`package.json` の `repository` URL は `ishibashi0112/comparison-grid` を仮置き(リポジトリ作成後に確定)。

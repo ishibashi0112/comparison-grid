@@ -4,6 +4,9 @@
      かけるため、読み込み順に依らずグリッド既定(セル背景 / 文字色 / readonly 背景)に勝ちます。
    - デザイントークン(--cmpg-*)は :where()(特異度 0)に置くため、利用側の
      `.cmpg-pane { --cmpg-diff-row-bg: ... }` 等の上書きは読み込み順に依らず必ず勝ちます。
+   - トークンは .cmpg-pane(ComparisonPane のラッパー)と .cmpg-grid(グリッド root。
+     useComparisonPane の gridProps.className)の両方に定義するため、ラッパー無しの
+     ヘッドレス利用でも差分ハイライトが効きます。
    - ダーク: spreadsheet-grid の theme="dark" がグリッド root へ付与する .ssg-theme-dark 配下で
      トークンを差し替えます(利用側は `.cmpg-pane .ssg-theme-dark { ... }` で上書き)。
    - Tailwind v4 で utilities を優先したい場合は `@import "...style.css" layer(components);` または
@@ -13,7 +16,7 @@
   --cmpg-view-gap: 16px;
 }
 
-:where(.cmpg-pane) {
+:where(.cmpg-pane, .cmpg-grid) {
   --cmpg-pane-header-min-height: 24px;
   --cmpg-pane-header-gap-x: 16px;
   --cmpg-pane-header-gap-y: 4px;
@@ -34,7 +37,7 @@
   --cmpg-rollup-row-hover-bg: #fef9c3;
 }
 
-:where(.cmpg-pane .ssg-theme-dark) {
+:where(.cmpg-pane .ssg-theme-dark, .cmpg-grid.ssg-theme-dark) {
   --cmpg-diff-row-bg: rgba(250, 204, 21, 0.14);
   --cmpg-diff-row-hover-bg: rgba(250, 204, 21, 0.22);
   --cmpg-diff-text: #f87171;
@@ -124,11 +127,11 @@
   color: var(--cmpg-context-row-text);
 }
 
-/* 色覚多様性向けプリセット: .cmpg-colors-cvd を .cmpg-view / .cmpg-pane(または祖先)に付与すると
+/* 色覚多様性向けプリセット: .cmpg-colors-cvd を .cmpg-view / .cmpg-pane / .cmpg-grid(または祖先)に付与すると
    黄 / 赤の既定を青 / 橙系へ差し替え、差分セルに下線(色に依らない手掛かり)を加える。
    トークンは特異度 0 で基底より後に定義するため基底に勝ち、利用側の上書きには負ける。 */
-:where(.cmpg-colors-cvd) :where(.cmpg-pane),
-:where(.cmpg-pane.cmpg-colors-cvd) {
+:where(.cmpg-colors-cvd) :where(.cmpg-pane, .cmpg-grid),
+:where(.cmpg-pane.cmpg-colors-cvd, .cmpg-grid.cmpg-colors-cvd) {
   /* 差分行: Tailwind blue-100 / blue-200。強調文字: orange-800(白地でコントラスト比 約 7:1)。 */
   --cmpg-diff-row-bg: #dbeafe;
   --cmpg-diff-row-hover-bg: #bfdbfe;
@@ -137,8 +140,8 @@
   --cmpg-rollup-row-hover-bg: #dbeafe;
 }
 
-:where(.cmpg-colors-cvd) :where(.cmpg-pane .ssg-theme-dark),
-:where(.cmpg-pane.cmpg-colors-cvd .ssg-theme-dark) {
+:where(.cmpg-colors-cvd) :where(.cmpg-pane .ssg-theme-dark, .cmpg-grid.ssg-theme-dark),
+:where(.cmpg-pane.cmpg-colors-cvd .ssg-theme-dark, .cmpg-grid.cmpg-colors-cvd.ssg-theme-dark) {
   --cmpg-diff-row-bg: rgba(59, 130, 246, 0.16);
   --cmpg-diff-row-hover-bg: rgba(59, 130, 246, 0.26);
   --cmpg-diff-text: #fdba74;
