@@ -1,6 +1,6 @@
 {
   "name": "@ishibashi0112/comparison-grid",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "React 19 製の 2 構成比較コンポーネント。左右のリストをキーで突き合わせ、指定フィールドの差分を @ishibashi0112/spreadsheet-grid 上でハイライト表示します。型・データ・列定義・比較設定を渡すだけで差分表示が組み上がります。",
   "keywords": [
     "react",
