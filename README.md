@@ -2,9 +2,9 @@
 
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-Side-by-side **two-list comparison** for **React 19**, built on top of [`@ishibashi0112/spreadsheet-grid`](https://www.npmjs.com/package/@ishibashi0112/spreadsheet-grid). Match two lists by key, highlight the rows and cells that differ, filter to differences only — by passing **your row type, your data, your column definitions and a minimal compare config**.
+Side-by-side **list comparison** (two lists, or three and more against a base) for **React 19**, built on top of [`@ishibashi0112/spreadsheet-grid`](https://www.npmjs.com/package/@ishibashi0112/spreadsheet-grid). Match lists by key, highlight the rows and cells that differ, filter to differences only — by passing **your row type, your data, your column definitions and a minimal compare config**. Compose the panes yourself with the compound `ComparisonLayout` components, or use the two-pane `ComparisonView` preset.
 
-**React 19** 製の「2 構成比較」コンポーネント。左右のリストをキーで突き合わせ、差分行 / 差分セルのハイライトと「差分のみ表示」を、**行の型・データ・列定義・最小限の比較設定を渡すだけ**で組み立てます。
+**React 19** 製の「構成比較」コンポーネント(2 構成、または基準に対する 3 構成以上)。リストをキーで突き合わせ、差分行 / 差分セルのハイライトと「差分のみ表示」を、**行の型・データ・列定義・最小限の比較設定を渡すだけ**で組み立てます。ペインの配置は合成コンポーネント `ComparisonLayout` で自由に組め、2 ペインのプリセット `ComparisonView` も使えます。
 
 **English** | [日本語](#日本語)
 
