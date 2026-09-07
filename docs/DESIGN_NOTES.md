@@ -168,7 +168,15 @@
 - `useComparisonPane` の `diffs` を `ComparisonAnyDiffMap`(2-way / N 構成の Union)に広げ、`getDiff` の返り型も Union に(`'side' in diff` で判別。API_REFERENCE に明記)。
 - テスト 216(+9)。
 
-## 6. 検討中(2026-09-07。batch 19〜22 で 6-3 の 1〜4 を実装済み — 次は 5 のデモ)
+### 実装済み(2026-09-07・batch 23。デモの N 構成モード)
+
+- `App.tsx` にモード切替バー(2 構成(階層)/ N 構成(平坦・合成コンポーネント))を追加し、テーマ / 配色の共通コントロールをそこへ移した。既存の木モード画面は `TreeComparisonDemo` に切り出しただけで内容は不変。
+- `demo/MultiComparisonDemo.tsx`: 構成の入力(基準ラジオ + 品番 + 削除、最大 5)/ プリセット(3 構成 / 4 構成 / 大量 3 構成)/ 差分のみ / 整列 / スクロール同期 / 縦並び / 差分ジャンプ。`useMultiComparison` → `useComparisonScrollSyncGroup`(Root と差分ジャンプで共有)→ `useMultiComparisonNavigation({ getHandle })` → `ComparisonLayout.Root` に `comparison.sides.map` でペインを並べる。構成 ID は位置固定(`side-n`。同じ品番を 2 回並べても衝突しない)、表示名は品番。
+- **平坦比較(キー = 品目コード)** にしている。木モードの N 化(`alignComparisonTree` の N 構造マージ)は未実装のため。キー重複は概要に「※ キー重複あり」で出す。
+- データ: `A1000-R3`(Rev.3。Rev.2 とは別の箇所を変更)を追加。`BOM_MULTI_PRESETS` を追加。
+- Playwright + 同梱 Chromium で 3 / 4 ペインの描画・整列 + 差分のみ・差分ジャンプを目視確認(基準ペインの集約ハイライト: 一部の構成に無い行はキー列が赤、和集合のフィールドが赤)。
+
+## 6. 検討中(2026-09-07。batch 19〜23 で 6-3 の 1〜5 を実装済み — 残りは 6 の木モード N 化)
 
 ### 6-1. N 構成比較(3・4 構成へ拡張)
 
@@ -251,7 +259,7 @@ HeroUI の `Dropdown.Trigger / .Popover / .Menu / .Item` の形は **Compound Co
 2. ~~`hooks/useMultiComparison.ts`(参照安定化 / 差分のみ / 整列の導出)。~~ **batch 20 で実装済み。**
 3. ~~`useComparisonScrollSync` の N 対応(2-way API 互換)+ `useComparisonNavigation` の N 版。~~ **batch 21 で実装済み。**
 4. ~~合成コンポーネント(Root / Pane / PaneHeader / Grid)+ `ComparisonView` の再実装(既存テスト全緑)。~~ **batch 22 で実装済み(名前は `ComparisonLayout.Root / .Pane / .Header / .Grid`)。**
-5. デモ: 3 構成プリセット(現行 + 案 1 + 案 2)。
+5. ~~デモ: 3 構成プリセット(現行 + 案 1 + 案 2)。~~ **batch 23 で実装済み(3 / 4 / 大量 3 構成)。**
 6. 木モードの N 化(必要になったら)。
 
 **決定済み(2026-09-07)**: 意味論は (A)。(B) は将来実装(捨てない)。合成版 `ComparisonPane` の名前は推奨案。木モードの N 化は後回し。

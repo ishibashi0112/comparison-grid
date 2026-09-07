@@ -201,3 +201,34 @@
 .demo-detail-button:hover {
   opacity: 1;
 }
+
+/* モード切替バー(両モード共通のテーマ / 配色もここ)。 */
+.demo-mode-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--demo-surface);
+  border: 1px solid var(--demo-border);
+}
+
+/* N 構成デモ: 構成ごとの入力(基準ラジオ + 品番 + 削除)。 */
+.demo-side-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.demo-badge {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--demo-primary);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+}

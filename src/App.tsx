@@ -1,6 +1,8 @@
 // ss2602(部品構成比較アプリ)の比較画面を comparison-grid で再現するデモです。
 //   利用側が書くのは「行の型 / データ / 列定義 / 比較設定」だけで、差分計算・ラベル生成・
 //   行 / セルのハイライト・差分のみフィルタはライブラリ側が担います(引き継ぎ書のゴール像)。
+//   モード切替: 「2 構成(階層)」= 従来の木モード(ComparisonView)/ 「N 構成(平坦)」= 基準 + 案 1・案 2…
+//   を合成コンポーネントで並べる(demo/MultiComparisonDemo.tsx)。
 import { useCallback, useMemo, useState, type FormEvent } from 'react';
 import type { GridColumn, GridTheme } from '@ishibashi0112/spreadsheet-grid';
 import {
@@ -20,7 +22,10 @@ import {
   type BomRow,
   type RootItemInfo,
 } from './demo/bomData';
+import { MultiComparisonDemo } from './demo/MultiComparisonDemo';
 import './App.css';
+
+type DemoMode = 'tree' | 'multi';
 
 // 1. 比較設定: 「差分を見る」フィールドを宣言するだけ。
 const COMPARE_FIELDS: CompareField<BomRow>[] = [
@@ -135,6 +140,59 @@ function PaneHeader({ info }: { info: RootItemInfo }) {
 }
 
 export default function App() {
+  const [mode, setMode] = useState<DemoMode>('tree');
+  const [theme, setTheme] = useState<GridTheme>('light');
+  const [cvdColors, setCvdColors] = useState(false);
+
+  // モード切替とテーマ / 配色は両モード共通のバーに置く。
+  const modeBar = (
+    <nav className="demo-mode-bar" aria-label="デモのモード">
+      <button
+        type="button"
+        className={mode === 'tree' ? 'demo-button demo-button--primary' : 'demo-button'}
+        onClick={() => setMode('tree')}
+      >
+        2 構成(階層)
+      </button>
+      <button
+        type="button"
+        className={mode === 'multi' ? 'demo-button demo-button--primary' : 'demo-button'}
+        onClick={() => setMode('multi')}
+      >
+        N 構成(平坦・合成コンポーネント)
+      </button>
+      <label className="demo-toggle">
+        テーマ
+        <select value={theme} onChange={(event) => setTheme(event.target.value as GridTheme)}>
+          <option value="light">light</option>
+          <option value="dark">dark</option>
+          <option value="auto">auto</option>
+        </select>
+      </label>
+      <label className="demo-toggle">
+        <input
+          type="checkbox"
+          checked={cvdColors}
+          onChange={(event) => setCvdColors(event.target.checked)}
+        />
+        色覚多様性配色
+      </label>
+    </nav>
+  );
+
+  return (
+    <div className={theme === 'dark' ? 'demo-app demo-app--dark' : 'demo-app'}>
+      {modeBar}
+      {mode === 'tree' ? (
+        <TreeComparisonDemo theme={theme} cvdColors={cvdColors} />
+      ) : (
+        <MultiComparisonDemo theme={theme} cvdColors={cvdColors} />
+      )}
+    </div>
+  );
+}
+
+function TreeComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cvdColors: boolean }) {
   const [leftCode, setLeftCode] = useState('A1000');
   const [rightCode, setRightCode] = useState('A1000-R2');
   const [leftRows, setLeftRows] = useState<BomRow[]>([]);
@@ -155,8 +213,6 @@ export default function App() {
       return next;
     });
   }, []);
-  const [theme, setTheme] = useState<GridTheme>('light');
-  const [cvdColors, setCvdColors] = useState(false);
   const [enableGridFeatures, setEnableGridFeatures] = useState(false);
 
   // 3. 木の構築: 平坦な展開結果 → 木。破綻(level の飛び等)は修復されず issues に報告される。
@@ -256,7 +312,7 @@ export default function App() {
   const hasData = leftRows.length > 0 || rightRows.length > 0;
 
   return (
-    <div className={theme === 'dark' ? 'demo-app demo-app--dark' : 'demo-app'}>
+    <>
       <header className="demo-header">
         <h1 className="demo-title">部品構成比較</h1>
         <form className="demo-form" onSubmit={handleSubmit}>
@@ -351,22 +407,6 @@ export default function App() {
             />
             ソート / フィルター
           </label>
-          <label className="demo-toggle">
-            テーマ
-            <select value={theme} onChange={(event) => setTheme(event.target.value as GridTheme)}>
-              <option value="light">light</option>
-              <option value="dark">dark</option>
-              <option value="auto">auto</option>
-            </select>
-          </label>
-          <label className="demo-toggle">
-            <input
-              type="checkbox"
-              checked={cvdColors}
-              onChange={(event) => setCvdColors(event.target.checked)}
-            />
-            色覚多様性配色
-          </label>
           <button
             type="button"
             className="demo-button"
@@ -430,6 +470,6 @@ export default function App() {
           rightGridProps={rightGridProps}
         />
       </main>
-    </div>
+    </>
   );
 }

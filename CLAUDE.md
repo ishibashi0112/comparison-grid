@@ -68,7 +68,7 @@ src/components/comparison-grid/
   view/ComparisonView.tsx 2 ペインレイアウト(合成コンポーネントで組んだプリセット。props / DOM は従来どおり)
   styles.css            .cmpg-* クラス + --cmpg-* トークン(未レイヤー / :where)
   index.ts              公開バレル
-src/App.tsx / src/demo/  ss2602(部品構成比較)再現デモ
+src/App.tsx / src/demo/  ss2602(部品構成比較)再現デモ。App.tsx はモード切替(2 構成 = 木モード / N 構成 = demo/MultiComparisonDemo.tsx の合成コンポーネント + 平坦比較)
 ```
 
 - jsdom で実グリッドの行 / セルを描画させるには、`@ishibashi0112/spreadsheet-grid/testing` の `installJsdomLayoutStubs()`(v0.29.0〜)を `beforeAll` で呼ぶ(`view/ComparisonView.test.tsx` 参照。返り値のアンインストーラを `afterAll` で呼ぶ)。no-op の ResizeObserver だと列が 1 本も描画されない。
