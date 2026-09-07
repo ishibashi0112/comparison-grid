@@ -34,6 +34,7 @@ export {
 // React 層。
 export { useComparison } from './hooks/useComparison';
 export { useTreeComparison } from './hooks/useTreeComparison';
+export { useMultiComparison } from './hooks/useMultiComparison';
 export { useComparisonNavigation } from './hooks/useComparisonNavigation';
 export { useManualRows } from './hooks/useManualRows';
 // ヘッドレス層: ComparisonPane / ComparisonView の本体。自前の SpreadsheetGrid に差分合成 / スクロール同期を配線する。
@@ -76,6 +77,9 @@ export type {
   ComparisonMultiResult,
   AlignComparisonRowsManyOptions,
   AlignComparisonRowsManyResult,
+  UseMultiComparisonOptions,
+  ComparisonMultiVisibleSide,
+  UseMultiComparisonResult,
   ComparisonAnyRowDiff,
   ComparisonAnyDiffMap,
   ComparisonExportOptions,

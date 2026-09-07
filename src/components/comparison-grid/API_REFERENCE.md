@@ -4,7 +4,7 @@
 > `view/*.tsx`)から手で起こした公開 API のスナップショットです。**型を変更したら本ファイルも同期してください。**
 > spreadsheet-grid 側の props / 型は [spreadsheet-grid の API_REFERENCE](https://github.com/ishibashi0112/datasheet-grid/blob/main/src/components/spreadsheet-grid/API_REFERENCE.md) を参照。
 
-最終更新: 2026-09-07(batch 19: N 構成比較の純ロジック — `compareMany` / `alignComparisonRowsMany`。ペインの差分合成は 2-way / N 構成の両方の差分を受け付ける)。
+最終更新: 2026-09-07(batch 20: N 構成比較の React 接続 `useMultiComparison`。batch 19 で純ロジック `compareMany` / `alignComparisonRowsMany`)。
 
 ## 設計の要点
 
@@ -346,6 +346,32 @@ const navigation = useComparisonNavigation({ comparison, alignRows });
 
 **メモ化**: `left` / `right`(木)/ `getCode` / `getRepresentativeCode` / `separator` は参照(同一性)で依存を判定します。アクセサはコンポーネント外で定義してください。`buildComparisonTree` は毎回新しい木を返すので `useMemo` で包みます。
 
+### `useMultiComparison<T>(options): UseMultiComparisonResult<T>`
+
+`compareMany()` の React 接続(`useComparison` の N 構成版)。`sides` / `compareFields` / `labels` を参照安定化し、「差分のみ」と整列を導出します。
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `sides` | `readonly ComparisonSideInput<T>[]` | (required) | 構成の配列(入力順がペインの既定順)。要素の `id` / `rows` / `label` を比較して参照安定化されるため、配列も要素もインラインで書いてよい(`rows` 自体は同一参照であること)。 |
+| `getMatchKey` / `compareFields` / `duplicateKeyPolicy` / `baseId` / `formatDiffLabel` / `labels` | (`CompareManyOptions<T>` と同じ) | | |
+| `showDiffOnly` | `boolean` | `false` | 「差分のみ表示」の意思。実効値は `effectiveShowDiffOnly`。 |
+| `alignRows` | `boolean` | `false` | 整列モード。全構成の `visibleRows` を同じ長さ(同じ行位置 = 同じ突き合わせ相手)にし、欠損側へプレースホルダ行を入れる(`alignComparisonRowsMany`)。 |
+| `createPlaceholderRow` | `(sideId: ComparisonSideId) => T` | `{} as T` | プレースホルダ行の生成。コンポーネント外で定義すること(インラインだと毎レンダー再整列)。 |
+
+戻り値(`UseMultiComparisonResult<T>`): `ComparisonMultiResult<T>` の `baseId` / `pairs` / `hasAnyDiff` に加えて:
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `sides` | `readonly ComparisonMultiVisibleSide<T>[]` | 入力順の構成別結果。`ComparisonMultiSideResult<T>` + `visibleRows`(差分のみ / 整列を適用した表示行。フィルタ無し・alignRows OFF のときは `rows` と同一参照)+ `placeholderRows`(整列で挿入されたプレースホルダ行の Set)。 |
+| `sidesById` / `getSide(id)` | `ReadonlyMap` / 関数 | ID 引き。 |
+| `compareFields` | `readonly CompareField<T>[]` | 参照安定化済み(ペインのセル強調に渡す)。 |
+| `hasAllSides` | `boolean` | 2 構成以上あり、全構成に行があるか(`useComparison` の `hasBothSides` に相当)。いずれかの構成が空だと基準の行が全件 `only` / `partial` になり「差分のみ」が全件表示と同義になるため、実効値の条件にしている。 |
+| `effectiveShowDiffOnly` | `boolean` | `hasAllSides && showDiffOnly`。 |
+| `canShowDiffOnly` | `boolean` | `hasAllSides && hasAnyDiff`(トグルの `disabled` に)。 |
+| `getDiff(row)` | `(row: T) => ComparisonMultiRowDiff<T> \| undefined` | どの構成の行でも差分を引ける(プレースホルダ行は `undefined`)。 |
+
+「差分のみ」は非整列では構成ごとに `same` 行を除き、整列では**行位置の単位**で「いずれかの構成に `same` 以外(プレースホルダを含む)があれば残す」ため、整列が保たれます。各構成の `visibleRows` / `diffs` / `placeholderRows` / `compareFields` を `useComparisonPane` に渡せば、2-way と同じ差分ハイライトが付きます(view 層の合成コンポーネントは後続バッチ)。
+
 ### `useComparisonNavigation<T>(options): UseComparisonNavigationResult<T>`
 
 差分ジャンプ(次 / 前の差分行へのスクロール)。グリッドのハンドル `ref` は**フックが生成して返す**ので、`leftGridProps={{ ref: leftRef }}` / `rightGridProps={{ ref: rightRef }}` で配線します(`enableScrollSync` の内部 ref とは自動で合成されます)。
@@ -574,4 +600,4 @@ const rightPane = useComparisonPane<Row>({ ..., gridProps: sync.rightGridProps }
 
 ヘッドレス層(`useComparisonPane` / `useComparisonScrollSync`)は batch 18(2026-09-07)で追加。`ComparisonPane` / `ComparisonView` の振る舞いは変えず、本体をフックへ移して薄い包みにした。
 
-N 構成比較(3・4 構成)は batch 19(2026-09-07)で純ロジック(`compareMany` / `alignComparisonRowsMany`)を追加。React 層(`useMultiComparison`)/ スクロール同期と差分ジャンプの N 対応 / 合成コンポーネント(`ComparisonRoot` / `ComparisonPane` / `ComparisonGrid`)/ 木モードの N 化は後続バッチ(`docs/DESIGN_NOTES.md` 6 章)。
+N 構成比較(3・4 構成)は batch 19(2026-09-07)で純ロジック(`compareMany` / `alignComparisonRowsMany`)、batch 20 で React 接続(`useMultiComparison`)を追加。スクロール同期と差分ジャンプの N 対応 / 合成コンポーネント(`ComparisonRoot` / `ComparisonPane` / `ComparisonGrid`)/ 木モードの N 化は後続バッチ(`docs/DESIGN_NOTES.md` 6 章)。

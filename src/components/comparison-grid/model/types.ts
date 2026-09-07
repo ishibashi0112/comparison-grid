@@ -694,3 +694,41 @@ export type AlignComparisonRowsManyResult<T> = {
 /** ペインの差分合成(paneColumns / useComparisonPane)が受け付ける差分の形(2-way / N 構成のどちらでも)。 */
 export type ComparisonAnyRowDiff<T> = ComparisonRowDiff<T> | ComparisonMultiRowDiff<T>;
 export type ComparisonAnyDiffMap<T> = ReadonlyMap<T, ComparisonAnyRowDiff<T>>;
+
+/** useMultiComparison のオプション。compareMany() の設定 + 表示の意思(差分のみ / 整列)。 */
+export type UseMultiComparisonOptions<T> = CompareManyOptions<T> & {
+  /** 構成の配列(入力順がペインの既定順)。要素の id / rows / label を浅く比較して参照安定化されるため、
+   *  インラインで書いてもよい(rows 自体は同一参照であること)。 */
+  sides: readonly ComparisonSideInput<T>[];
+  /** 「差分のみ表示」の意思(state)。実効値は effectiveShowDiffOnly として導出されます。 */
+  showDiffOnly?: boolean;
+  /** 整列モード(既定 false)。全構成を同じ行位置 = 同じ突き合わせ相手に揃え、欠損側にプレースホルダ行を入れる。 */
+  alignRows?: boolean;
+  /** alignRows 時のプレースホルダ行生成。インライン関数は毎レンダー再整列になるため、コンポーネント外で定義すること。 */
+  createPlaceholderRow?: (sideId: ComparisonSideId) => T;
+};
+
+/** useMultiComparison が返す構成ごとの結果。compareMany() の構成別結果に表示行を足したもの。 */
+export type ComparisonMultiVisibleSide<T> = ComparisonMultiSideResult<T> & {
+  /** effectiveShowDiffOnly / alignRows 適用後の表示行。フィルタ無し・alignRows OFF のときは rows と同一参照。 */
+  visibleRows: readonly T[];
+  /** alignRows で visibleRows に挿入されたプレースホルダ行(OFF のときは空 Set)。 */
+  placeholderRows: ReadonlySet<T>;
+};
+
+export type UseMultiComparisonResult<T> = Omit<ComparisonMultiResult<T>, 'sides' | 'sidesById'> & {
+  sides: readonly ComparisonMultiVisibleSide<T>[];
+  sidesById: ReadonlyMap<ComparisonSideId, ComparisonMultiVisibleSide<T>>;
+  /** 参照安定化済みの compareFields(ペインのセル強調に使用)。 */
+  compareFields: readonly CompareField<T>[];
+  /** 2 構成以上あり、全構成に行があるか(useComparison の hasBothSides に相当)。 */
+  hasAllSides: boolean;
+  /** hasAllSides && showDiffOnly。 */
+  effectiveShowDiffOnly: boolean;
+  /** 「差分のみ」トグルを有効にしてよいか(hasAllSides && hasAnyDiff)。 */
+  canShowDiffOnly: boolean;
+  /** どの構成の行でも差分を引ける参照関数(プレースホルダ行は undefined)。 */
+  getDiff: (row: T) => ComparisonMultiRowDiff<T> | undefined;
+  /** 構成 ID 引き(sidesById.get と同じ)。 */
+  getSide: (id: ComparisonSideId) => ComparisonMultiVisibleSide<T> | undefined;
+};

@@ -55,6 +55,7 @@ src/components/comparison-grid/
   hooks/useStableValue.ts 参照安定化(浅い構造比較)
   hooks/useComparison.ts  compare() の React 接続、alignRows / 差分のみフィルタの導出
   hooks/useTreeComparison.ts 階層比較(木)の React 接続: キー導出 / 構造整列 / 祖先を残す「差分のみ」(contextRows)
+  hooks/useMultiComparison.ts N 構成比較の React 接続(compareMany + 構成ごとの差分のみ / 整列の導出)
   hooks/useComparisonNavigation.ts 差分ジャンプ(次 / 前の差分行へスクロール)
   hooks/useManualRows.ts  マニュアル入力(末尾空行維持 / 正規化 / 送信時検証)
   hooks/useComparisonPane.ts ヘッドレス層: ペインの差分合成(SpreadsheetGrid へスプレッドできる gridProps を返す。ComparisonPane の本体)

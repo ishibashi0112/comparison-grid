@@ -140,7 +140,15 @@
 - **整列**: 基準の行順を軸に対応行を同じ位置へ、基準に無い行は「構成順 → 行順」で末尾。基準に無い同キーの行は他構成どうしで同じ行位置にまとめる(比較はしないが目視で並ぶ)。2 構成では `alignComparisonRows` と同じ並び(テストで確認)。
 - 公開: `compareMany` / `formatDefaultMultiDiffLabel` / `DEFAULT_COMPARISON_MULTI_LABELS` / `alignComparisonRowsMany` + 型 17 個。テスト 186(+28)。
 
-## 6. 検討中(2026-09-07。batch 19 で 6-3 の 1 を実装済み — 次は 2 以降)
+### 実装済み(2026-09-07・batch 20。`useMultiComparison`)
+
+- `useComparison` と同じ構造(参照安定化 → useMemo(compareMany) → 導出)。`sides` は要素ごとに `id` / `rows` / `label` を比較する専用の等値関数で安定化(配列も要素オブジェクトもインライン可)。
+- `hasAllSides`(2 構成以上かつ全構成に行がある)を `hasBothSides` の対応物にした。空の構成があると基準の行が全件 only / partial になるため、2-way と同じ理由で「差分のみ」の実効条件にする。
+- 整列時の「差分のみ」は行位置単位(いずれかの構成に same 以外、またはプレースホルダがあれば残す)。非整列は構成ごとに same を除く。フィルタ無し・非整列では `visibleRows` が入力と同一参照。
+- 戻り値は `ComparisonMultiResult` の `sides` を `visibleRows` / `placeholderRows` 付きに差し替えた形(`ComparisonMultiVisibleSide`)。`useComparisonPane` にそのまま渡せる粒度。
+- テスト 194(+8)。
+
+## 6. 検討中(2026-09-07。batch 19〜20 で 6-3 の 1〜2 を実装済み — 次は 3 以降)
 
 ### 6-1. N 構成比較(3・4 構成へ拡張)
 
@@ -220,7 +228,7 @@ HeroUI の `Dropdown.Trigger / .Popover / .Menu / .Item` の形は **Compound Co
 ### 6-3. 実装バッチ案(1 バッチ = 1 コミット)
 
 1. ~~`logic/compareMany.ts` + `logic/alignRowsMany.ts`(純ロジック + 単体テスト)。`paneColumns` の判定一般化。~~ **batch 19 で実装済み。**
-2. `hooks/useMultiComparison.ts`(参照安定化 / 差分のみ / 整列の導出)。
+2. ~~`hooks/useMultiComparison.ts`(参照安定化 / 差分のみ / 整列の導出)。~~ **batch 20 で実装済み。**
 3. `useComparisonScrollSync` の N 対応(2-way API 互換)+ `useComparisonNavigation` の N 版。
 4. 合成コンポーネント(Root / Pane / PaneHeader / Grid)+ `ComparisonView` の再実装(既存テスト全緑)。
 5. デモ: 3 構成プリセット(現行 + 案 1 + 案 2)。
