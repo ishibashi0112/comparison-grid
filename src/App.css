@@ -123,7 +123,9 @@
 
 .demo-pane-spec {
   margin: 0;
-  white-space: nowrap;
+  /* 3 ペイン以上では横幅が狭くなるため折り返す(nowrap だと隣のペインに重なる)。 */
+  white-space: normal;
+  overflow-wrap: anywhere;
   color: var(--demo-muted);
 }
 
