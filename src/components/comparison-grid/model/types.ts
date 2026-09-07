@@ -328,7 +328,8 @@ export type ComparisonExportOptions<T> = {
 export type UseComparisonPaneOptions<T extends object> = ComparisonHighlightOptions &
   ComparisonDiffLabelColumnProps<T> & {
     rows: readonly T[];
-    diffs: ComparisonDiffMap<T>;
+    /** この側の差分 Map。2-way(leftDiffs / rightDiffs)でも N 構成(side.diffs)でもよい。 */
+    diffs: ComparisonAnyDiffMap<T>;
     columns: readonly GridColumn<T>[];
     /** セル強調の対応付けに使用(useComparison の compareFields を渡す)。 */
     compareFields?: readonly CompareField<T>[];
@@ -364,8 +365,9 @@ export type UseComparisonPaneResult<T extends object> = {
   columns: GridColumn<T>[];
   /** ライブラリの行クラスと利用側 getRowClassName を合成した関数(付与するものが無ければ利用側のもの)。 */
   getRowClassName: SpreadsheetGridProps<T>['getRowClassName'];
-  /** この側の差分を引く参照関数(renderCell 内で差分に応じた描画をするときに)。 */
-  getDiff: (row: T) => ComparisonRowDiff<T> | undefined;
+  /** この側の差分を引く参照関数(renderCell 内で差分に応じた描画をするときに)。2-way の diffs を渡した場合も
+   *  型は ComparisonAnyRowDiff(`'side' in diff` で 2-way と判別できる)。 */
+  getDiff: (row: T) => ComparisonAnyRowDiff<T> | undefined;
 };
 
 export type ComparisonPaneProps<T extends object> = UseComparisonPaneOptions<T> & {
@@ -804,4 +806,86 @@ export type UseMultiComparisonNavigationResult<T> = {
   goToDiff: (index: number) => void;
   goToNextDiff: () => void;
   goToPreviousDiff: () => void;
+};
+
+// ---------------------------------------------------------------------------------------------
+// 合成コンポーネント(ComparisonLayout.Root / .Pane / .Header / .Grid)。
+//   Root が Context で比較結果・列・ハイライト設定・スクロール同期グループを配り、Pane / Header / Grid は
+//   「役割」を名乗るだけで配置は利用側の JSX が決めます。ペインの数は JSX の子の数(2-way / N 構成のどちらでも)。
+// ---------------------------------------------------------------------------------------------
+
+/** Root に渡す N 構成のモデル(useMultiComparison の戻り値をそのまま渡せる)。 */
+export type ComparisonMultiViewModel<T> = {
+  sides: readonly Pick<ComparisonMultiVisibleSide<T>, 'id' | 'visibleRows' | 'diffs' | 'placeholderRows'>[];
+  compareFields?: readonly CompareField<T>[];
+};
+
+/** Root の comparison。2-way(useComparison / useTreeComparison)か N 構成(useMultiComparison)。 */
+export type ComparisonLayoutModel<T> = ComparisonViewModel<T> | ComparisonMultiViewModel<T>;
+
+/** Root が正規化した構成 1 つぶんの表示データ。2-way では id が 'left' / 'right'。 */
+export type ComparisonLayoutSide<T> = {
+  id: ComparisonSideId;
+  rows: readonly T[];
+  diffs: ComparisonAnyDiffMap<T>;
+  placeholderRows?: ReadonlySet<T>;
+  contextRows?: ReadonlySet<T>;
+  descendantDiffCounts?: ReadonlyMap<T, number>;
+};
+
+export type ComparisonLayoutRootProps<T extends object> = ComparisonHighlightOptions &
+  ComparisonDiffLabelColumnProps<T> & {
+    comparison: ComparisonLayoutModel<T>;
+    columns: readonly GridColumn<T>[];
+    keyColumnKeys?: readonly string[];
+    /** ペイン配置(既定 'horizontal')。'horizontal' は子の数だけ等幅カラム、'vertical' は 1 カラムに積む。 */
+    layout?: ComparisonViewLayout;
+    /** 全ペインのスクロールを同期する(既定 false)。同期軸は layout に依る(横並び = 縦のみ / 縦並び = 縦横)。 */
+    enableScrollSync?: boolean;
+    /** 同期グループを外から渡す(useMultiComparisonNavigation の getHandle と共有するとき等)。
+     *  渡した場合 enableScrollSync / layout による軸設定は無視され、グループ自身の設定が使われる。 */
+    scrollSyncGroup?: ComparisonScrollSyncGroup<T>;
+    /** 全ペイン共通の grid props(Grid の gridProps が上にマージされる)。 */
+    gridProps?: ComparisonGridProps<T>;
+    className?: string;
+    style?: CSSProperties;
+    children?: ReactNode;
+  };
+
+export type ComparisonLayoutPaneProps = {
+  /** 構成 ID(2-way では 'left' / 'right')。配下の Grid / Header がこれを参照する。 */
+  side: ComparisonSideId;
+  className?: string;
+  style?: CSSProperties;
+  children?: ReactNode;
+};
+
+export type ComparisonLayoutHeaderProps = {
+  className?: string;
+  style?: CSSProperties;
+  children?: ReactNode;
+};
+
+export type ComparisonLayoutGridProps<T> = {
+  /** 構成 ID。Pane の配下では省略可(Pane の side を使う)。Pane 無しで自前ラッパーに置くときに指定する。 */
+  side?: ComparisonSideId;
+  /** このグリッドだけの grid props(Root の gridProps の上にマージ)。 */
+  gridProps?: ComparisonGridProps<T>;
+  /** グリッド領域(.cmpg-pane-body)の className / style。 */
+  className?: string;
+  style?: CSSProperties;
+};
+
+/** Root が Context で配る値(useComparisonLayout() で取り出せる。自作のツールバー / 集計表示などに)。 */
+export type ComparisonLayoutContextValue<T> = {
+  /** 正規化済みの構成(comparison の順)。 */
+  sides: readonly ComparisonLayoutSide<T>[];
+  getSide: (id: ComparisonSideId) => ComparisonLayoutSide<T> | undefined;
+  columns: readonly GridColumn<T>[];
+  keyColumnKeys?: readonly string[];
+  compareFields?: readonly CompareField<T>[];
+  highlight: ComparisonHighlightOptions & ComparisonDiffLabelColumnProps<T>;
+  gridProps?: ComparisonGridProps<T>;
+  layout: ComparisonViewLayout;
+  scrollSyncGroup: ComparisonScrollSyncGroup<T>;
 };

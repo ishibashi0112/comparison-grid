@@ -49,6 +49,19 @@ export {
 } from './hooks/useComparisonScrollSync';
 export { ComparisonPane } from './view/ComparisonPane';
 export { ComparisonView } from './view/ComparisonView';
+// 合成コンポーネント: Root が Context で配り、Pane / Header / Grid は役割だけ。ペイン数は JSX の子の数。
+export {
+  ComparisonLayoutRoot,
+  ComparisonLayoutPane,
+  ComparisonLayoutHeader,
+  ComparisonLayoutGrid,
+} from './view/ComparisonLayout';
+export { ComparisonLayout } from './view/comparisonLayoutNamespace';
+export {
+  useComparisonLayout,
+  useComparisonLayoutSide,
+  normalizeLayoutSides,
+} from './view/comparisonLayoutContext';
 
 export type {
   ComparisonSide,
@@ -133,4 +146,12 @@ export type {
   ComparisonViewModel,
   ComparisonViewLayout,
   ComparisonViewProps,
+  ComparisonMultiViewModel,
+  ComparisonLayoutModel,
+  ComparisonLayoutSide,
+  ComparisonLayoutRootProps,
+  ComparisonLayoutPaneProps,
+  ComparisonLayoutHeaderProps,
+  ComparisonLayoutGridProps,
+  ComparisonLayoutContextValue,
 } from './model/types';

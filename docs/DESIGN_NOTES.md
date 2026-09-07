@@ -156,7 +156,19 @@
 - **差分ジャンプ `useMultiComparisonNavigation`**: 停止 = `{ kind, indices: Map<sideId, index>, rows }`。基準の行順 → 基準に無い行(構成順 → 行順、同キーは 1 停止にまとめる)。`alignRows` では行位置順に並べ、行の無い構成も同じ行位置へスクロール。ハンドルは `refs`(構成 ID の並びをキーに useMemo で生成した `{ current: null }`)か `getHandle` オプション(group と共用)から取る。純ロジック部分は `collectMultiDiffStops` として公開。
 - テスト 207(+13)。
 
-## 6. 検討中(2026-09-07。batch 19〜21 で 6-3 の 1〜3 を実装済み — 次は 4 の合成コンポーネント)
+### 実装済み(2026-09-07・batch 22。合成コンポーネント `ComparisonLayout.Root / .Pane / .Header / .Grid`)
+
+- **名前**: 既存 `ComparisonPane`(props 直渡し)との衝突を避け、合成部品は `ComparisonLayout` ファミリー(`ComparisonLayoutRoot` / `ComparisonLayoutPane` / `ComparisonLayoutHeader` / `ComparisonLayoutGrid`)にした。「Layout = 配置は利用側が組む」の含意。名前空間 `ComparisonLayout = { Root, Pane, Header, Grid }` は別ファイル(`comparisonLayoutNamespace.ts`)の同じ実体で、主は名前付き export(tree-shaking)。`ComparisonSide`(型)との衝突も回避。
+- **Context は非ジェネリックに保持**(`createContext<…<never> | null>`)し、`useComparisonLayout<T>()` で T を付け直す。Context / フック / 正規化は `comparisonLayoutContext.ts` に分離(react-refresh/only-export-components を満たすため。コンポーネント本体のファイルはコンポーネントだけを export)。
+- **Root の comparison は 2-way / N 構成の Union**(`'sides' in model` で判別)。正規化 `normalizeLayoutSides` の依存はモデルの中身(visibleLeft / leftDiffs … / sides)にし、利用側がインラインで組んだモデルでも再正規化しない(`react-hooks/exhaustive-deps` を局所的に無効化)。
+- **Grid の本体はヘッドレス層の合成**: `useSyncedGridProps(group, side, merged)` → `useComparisonPane`。同期 OFF でもハンドルを登録する(差分ジャンプが `group.getHandle` で引ける)。Root は `scrollSyncGroup` の注入を受け付け、無ければ自前で生成(フックは常に呼び、使うほうを選ぶ)。
+- **フック順の維持**: Grid は side 不明 / 不在でも全フックを呼び切ってから例外にする(条件付きフックを避ける)。例外は日本語メッセージ。
+- **CSS**: `.cmpg-view` に `grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr)` を足し、明示 2 カラム + 暗黙カラムで子の数だけ等幅に。縦並びは `grid-auto-flow: row`。既存 2 ペインの見た目は不変。
+- **`ComparisonView` は合成部品で書き直したプリセット**(props / DOM / 振る舞い不変。既存テスト全緑)。旧 `useScrollSyncGridProps` 相当の配線は Root に移った。
+- `useComparisonPane` の `diffs` を `ComparisonAnyDiffMap`(2-way / N 構成の Union)に広げ、`getDiff` の返り型も Union に(`'side' in diff` で判別。API_REFERENCE に明記)。
+- テスト 216(+9)。
+
+## 6. 検討中(2026-09-07。batch 19〜22 で 6-3 の 1〜4 を実装済み — 次は 5 のデモ)
 
 ### 6-1. N 構成比較(3・4 構成へ拡張)
 
@@ -238,7 +250,7 @@ HeroUI の `Dropdown.Trigger / .Popover / .Menu / .Item` の形は **Compound Co
 1. ~~`logic/compareMany.ts` + `logic/alignRowsMany.ts`(純ロジック + 単体テスト)。`paneColumns` の判定一般化。~~ **batch 19 で実装済み。**
 2. ~~`hooks/useMultiComparison.ts`(参照安定化 / 差分のみ / 整列の導出)。~~ **batch 20 で実装済み。**
 3. ~~`useComparisonScrollSync` の N 対応(2-way API 互換)+ `useComparisonNavigation` の N 版。~~ **batch 21 で実装済み。**
-4. 合成コンポーネント(Root / Pane / PaneHeader / Grid)+ `ComparisonView` の再実装(既存テスト全緑)。
+4. ~~合成コンポーネント(Root / Pane / PaneHeader / Grid)+ `ComparisonView` の再実装(既存テスト全緑)。~~ **batch 22 で実装済み(名前は `ComparisonLayout.Root / .Pane / .Header / .Grid`)。**
 5. デモ: 3 構成プリセット(現行 + 案 1 + 案 2)。
 6. 木モードの N 化(必要になったら)。
 

@@ -16,13 +16,14 @@ Side-by-side **two-list comparison** for **React 19**, built on top of [`@ishiba
 - **Four diff kinds** — `same` / `left-only` / `right-only` / `field-diff`, with a generated label (`"左のみ"`, `"数量・支給区分違い"`, …) that you can reword or replace.
 - **`useComparison()`** — derives `visibleLeft` / `visibleRight` (diff-only filter), `effectiveShowDiffOnly` (never `true` when one side is empty), `canShowDiffOnly` (for disabling the toggle), per-side counts and duplicate-key reports.
 - **Aligned mode (`alignRows`)** — both panes get the same length in match order, with placeholder rows (styled `.cmpg-row-placeholder`) inserted on the missing side; the diff-only filter works per pair so alignment is preserved.
-- **3+ configurations (`compareMany()` / `alignComparisonRowsMany()`)** — pick one side as the base and every other side is compared against it. Non-base rows carry the plain two-way diff; base rows aggregate it (`fieldDiffs` is the union, `missingIn` lists the sides that lack the row, `bySide` keeps the per-side detail) with labels like `案1: 数量違い / 案2: 無し`. `useMultiComparison()` adds the diff-only filter, aligned mode and `hasAllSides` on top, per side; feed each side's `visibleRows` / `diffs` to `useComparisonPane`. Scroll sync (`useComparisonScrollSyncMany()`) and diff navigation (`useMultiComparisonNavigation()`) work across any number of sides. The compound view components are the next batch.
+- **3+ configurations (`compareMany()` / `alignComparisonRowsMany()`)** — pick one side as the base and every other side is compared against it. Non-base rows carry the plain two-way diff; base rows aggregate it (`fieldDiffs` is the union, `missingIn` lists the sides that lack the row, `bySide` keeps the per-side detail) with labels like `案1: 数量違い / 案2: 無し`. `useMultiComparison()` adds the diff-only filter, aligned mode and `hasAllSides` on top, per side; feed each side's `visibleRows` / `diffs` to `useComparisonPane`. Scroll sync (`useComparisonScrollSyncMany()`) and diff navigation (`useMultiComparisonNavigation()`) work across any number of sides, and `ComparisonLayout` renders as many panes as you put in the JSX.
 - **Hierarchical comparison (`useTreeComparison()`)** — for BOM-like trees. Build a tree from flat rows (`buildComparisonTree`: depth-first + level, or adjacency list), and the library derives **path keys** (`B2002/C3001`) so the same part under a different parent never pairs; representative-code substitution propagates to descendants; sibling duplicates get an occurrence suffix; broken input is reported as `issues`, never repaired. Aligned mode becomes a structural merge (right-only subtrees land next to their siblings) and the diff-only filter keeps ancestors as dimmed context rows. Unchanged parents with changes below get a `.cmpg-row-rollup` tint and a `配下に差分 n 件` label in the diff-label column (`getDescendantDiffCount(row)` for your own columns). Collapse subtrees with `collapsedKeys` — a `Set` of path keys, so one key folds the pair on both panes.
 - **Scroll sync (`enableScrollSync`)** — keeps both panes' scroll in lockstep (user scrolls propagate, API-driven ones are ignored to prevent loops). Pairs naturally with `alignRows`. Which axes sync follows the layout: side-by-side syncs vertical only; stacked (`layout='vertical'`) syncs both axes so the columns stay aligned too.
 - **Export (`getComparisonExportData()`)** — one side's rows + diff label column in the same `{ columns, rows: { value, text }[][] }` shape as the grid's `getExportData()`, so downstream CSV/Excel code can be shared.
 - **Diff navigation (`useComparisonNavigation()`)** — next/previous-diff jumping that scrolls both panes to the matching pair (wraps around; understands `alignRows` placeholders).
 - **Manual input helper (`useManualRows()`)** — row state for an editable pane: keeps a trailing empty row, normalizes edits, validates on submit; `dataRows` (blanks excluded) feeds `useComparison`.
 - **`ComparisonView` / `ComparisonPane`** — two `SpreadsheetGrid`s with row highlight, key-column highlight for one-sided rows, field-cell highlight for differing values, and an optional auto-inserted diff-label column. You write plain `GridColumn<T>[]`; the library composes its classes with yours. Panes sit side by side by default, or stack top/bottom with `layout='vertical'` (left pane on top) — handy for wide tables.
+- **Compound components (`ComparisonLayout.Root` / `.Pane` / `.Header` / `.Grid`)** — the same shape as HeroUI's `Dropdown.Trigger` / `.Popover`: `Root` provides the comparison, columns and scroll-sync group through context, and each `Pane` / `Header` / `Grid` just names its role, so you decide the DOM, the order and how many panes there are. Works with `useComparison` (`side="left"` / `"right"`) and `useMultiComparison` (any side id) alike; `ComparisonView` is the two-pane preset built on it.
 - **Headless view layer (`useComparisonPane()` / `useComparisonScrollSync()`)** — the panes and scroll sync are hooks first, components second. `useComparisonPane` returns `gridProps` you spread onto your own `SpreadsheetGrid` (composed columns, row classes, `getDiff`), and `useComparisonScrollSync` returns the composed `ref` / `onScroll` pair. `ComparisonPane` / `ComparisonView` are thin wrappers over them, so you can drop down a level whenever you need your own DOM or layout without losing any highlighting or sync.
 - **Every grid feature stays available** — `gridProps` passes `SpreadsheetGridProps<T>` through (sorting, filters, theme, density, context menu, imperative `ref`…). Only `rows` / `columns` / `dataSource` are reserved.
 - **Themeable** — colors and gaps are CSS custom properties (`--cmpg-*`) defined at zero specificity; a dark preset follows `theme="dark"` automatically, and an opt-in color-vision-deficiency preset (`.cmpg-colors-cvd`: blue/orange plus underlined diff cells) is included. Unlayered CSS plus a `style.layer.css` variant for Tailwind v4 cascade layers.
@@ -200,6 +201,25 @@ const nav = useMultiComparisonNavigation({ comparison: multi, alignRows: true, g
 // pass sync.sides[side.id] as gridProps to each pane; nav.goToNextDiff() scrolls every side
 ```
 
+Or let the compound components do the wiring — `Root` owns the scroll-sync group, and each `Grid` registers its handle with it:
+
+```tsx
+import { ComparisonLayout, useMultiComparison, useComparisonScrollSyncGroup, useMultiComparisonNavigation } from '@ishibashi0112/comparison-grid';
+
+const multi = useMultiComparison({ sides, getMatchKey: (r) => r.id, compareFields, alignRows: true });
+const group = useComparisonScrollSyncGroup<Row>();                       // optional: share it with navigation
+const nav = useMultiComparisonNavigation({ comparison: multi, alignRows: true, getHandle: group.getHandle });
+
+<ComparisonLayout.Root<Row> comparison={multi} columns={columns} keyColumnKeys={['id']} scrollSyncGroup={group} showDiffLabelColumn>
+  {multi.sides.map((side) => (
+    <ComparisonLayout.Pane key={side.id} side={side.id}>
+      <ComparisonLayout.Header>{side.label}</ComparisonLayout.Header>
+      <ComparisonLayout.Grid<Row> gridProps={{ height: 480 }} />
+    </ComparisonLayout.Pane>
+  ))}
+</ComparisonLayout.Root>;
+```
+
 The view layer is headless too. `useComparisonPane` gives you everything `ComparisonPane` would wire into the grid, as props you spread yourself, and `useComparisonScrollSync` gives you the composed `ref` / `onScroll` for both sides. Use them when you want your own DOM, headers or layout:
 
 ```tsx
@@ -371,13 +391,14 @@ MIT
 - **4 種類の差分** — `same` / `left-only` / `right-only` / `field-diff` と、生成ラベル(`"左のみ"`、`"数量・支給区分違い"` など)。文言の差し替え / 完全カスタムが可能。
 - **`useComparison()`** — `visibleLeft` / `visibleRight`(差分のみフィルタ)、`effectiveShowDiffOnly`(片側が空なら常に `false`)、`canShowDiffOnly`(トグルの無効化条件)、片側ごとの件数、キー重複の報告を導出します。
 - **左右整列モード(`alignRows`)** — 両ペインを突き合わせ順の同じ長さに揃え、欠損側へプレースホルダ行(`.cmpg-row-placeholder`)を挿入。「差分のみ」は対の単位でフィルタされ、整列が保たれます。
-- **3 構成以上の比較(`compareMany()` / `alignComparisonRowsMany()`)** — 1 つを基準にして他の各構成を基準と比較します。基準以外の行は素の 2-way 差分、基準の行はその集約(`fieldDiffs` は和集合、`missingIn` に「無い構成」、`bySide` に構成別の内訳)で、ラベルは `案1: 数量違い / 案2: 無し` のようになります。`useMultiComparison()` が構成ごとの差分のみフィルタ / 整列 / `hasAllSides` を導出するので、各構成の `visibleRows` / `diffs` を `useComparisonPane` に渡せば表示できます。スクロール同期(`useComparisonScrollSyncMany()`)と差分ジャンプ(`useMultiComparisonNavigation()`)も構成数に依らず使えます。合成コンポーネント版の view は後続バッチです。
+- **3 構成以上の比較(`compareMany()` / `alignComparisonRowsMany()`)** — 1 つを基準にして他の各構成を基準と比較します。基準以外の行は素の 2-way 差分、基準の行はその集約(`fieldDiffs` は和集合、`missingIn` に「無い構成」、`bySide` に構成別の内訳)で、ラベルは `案1: 数量違い / 案2: 無し` のようになります。`useMultiComparison()` が構成ごとの差分のみフィルタ / 整列 / `hasAllSides` を導出するので、各構成の `visibleRows` / `diffs` を `useComparisonPane` に渡せば表示できます。スクロール同期(`useComparisonScrollSyncMany()`)と差分ジャンプ(`useMultiComparisonNavigation()`)も構成数に依らず使え、`ComparisonLayout` は JSX に置いた数だけペインを描画します。
 - **階層比較(`useTreeComparison()`)** — 部品表のような木構造向け。平坦な行から木を組み立て(`buildComparisonTree`: 深さ優先順 + level、または隣接リスト)、ライブラリが**パスキー**(`B2002/C3001`)を導出するので、別の親の下の同じ品番が突き合うことがありません。代表品番の置き換えは子孫へ伝播、兄弟の重複には出現番号、入力の破綻は修復せず `issues` で報告。整列モードは構造マージ(右のみサブツリーが兄弟の位置に入る)になり、「差分のみ」では祖先が薄い文脈行として残ります。自身は同一でも配下に差分がある親には `.cmpg-row-rollup` の淡い色と、差分ラベル列に `配下に差分 n 件` が出ます(自作列には `getDescendantDiffCount(row)`)。サブツリーの折りたたみは `collapsedKeys`(パスキーの `Set`。1 つのキーで両ペインの対が畳まれます)。
 - **スクロール同期(`enableScrollSync`)** — 両ペインのスクロールを同期(ユーザー操作のみ伝播し、API 由来は無視してループを防止)。`alignRows` との併用を想定。同期する軸はレイアウトに追従: 横並びは縦のみ、縦並び(`layout='vertical'`)は列も上下に揃うため縦横両方。
 - **エクスポート(`getComparisonExportData()`)** — 片側の行 + 差分ラベル列を、本体の `getExportData()` と同形(`{ columns, rows: { value, text }[][] }`)で返します。CSV / Excel 出力の下流処理を共用できます。
 - **差分ジャンプ(`useComparisonNavigation()`)** — 次 / 前の差分へ両ペインを対でスクロール(末尾からは先頭へラップ。`alignRows` のプレースホルダ位置も理解します)。
 - **マニュアル入力ヘルパー(`useManualRows()`)** — 編集可能ペイン用の行 state: 末尾空行の維持 / 変更時の正規化 / 送信時検証。空行を除いた `dataRows` を `useComparison` に渡します。
 - **`ComparisonView` / `ComparisonPane`** — 2 つの `SpreadsheetGrid` に、差分行ハイライト / 片側のみ行のキー列強調 / 差分フィールドセルの強調 / 差分ラベル列(任意)を配線。利用側は素の `GridColumn<T>[]` を書くだけで、ライブラリのクラスは利用側のクラスと合成されます。ペインは既定で左右に並び、`layout='vertical'` で上下(left が上)に積めます — 列数の多い表に便利。
+- **合成コンポーネント(`ComparisonLayout.Root` / `.Pane` / `.Header` / `.Grid`)** — HeroUI の `Dropdown.Trigger` / `.Popover` と同じ形。`Root` が比較結果・列・スクロール同期グループを Context で配り、`Pane` / `Header` / `Grid` は役割を名乗るだけなので、DOM・順序・ペインの数は利用側が決められます。`useComparison`(`side="left"` / `"right"`)でも `useMultiComparison`(任意の構成 ID)でも同じ書き方で、`ComparisonView` はこれで組んだ 2 ペインのプリセットです。
 - **ヘッドレスな View 層(`useComparisonPane()` / `useComparisonScrollSync()`)** — ペインとスクロール同期はフックが本体で、コンポーネントは便利品。`useComparisonPane` は自前の `SpreadsheetGrid` にスプレッドできる `gridProps`(合成済みの列 / 行クラス / `getDiff`)を返し、`useComparisonScrollSync` は合成済みの `ref` / `onScroll` を返します。`ComparisonPane` / `ComparisonView` はその薄い包みなので、DOM や配置を自分で決めたくなったらハイライトも同期も失わずに一段降りられます。
 - **グリッドの全機能をそのまま利用可** — `gridProps` で `SpreadsheetGridProps<T>` を透過(ソート / フィルター / テーマ / 密度 / コンテキストメニュー / 命令的 `ref` …)。予約するのは `rows` / `columns` / `dataSource` だけ。
 - **テーマ対応** — 色と余白は特異度 0 で定義した CSS 変数(`--cmpg-*`)。`theme="dark"` に自動追従するダークプリセットに加え、色覚多様性向けのオプトインプリセット(`.cmpg-colors-cvd`: 青 / 橙系 + 差分セル下線)付き。未レイヤー CSS と、Tailwind v4 向けの `style.layer.css` の二本立て。
@@ -553,6 +574,25 @@ for (const side of multi.sides) {
 const sync = useComparisonScrollSyncMany<Row>({ sides: syncSides }); // syncSides = useMemo(() => ({ base: undefined, a: undefined, b: undefined }), [])
 const nav = useMultiComparisonNavigation({ comparison: multi, alignRows: true, getHandle: sync.group.getHandle });
 // 各ペインの gridProps に sync.sides[side.id] を渡す。nav.goToNextDiff() は全構成をスクロールする
+```
+
+配線は合成コンポーネントに任せることもできます。`Root` がスクロール同期グループを持ち、各 `Grid` がハンドルを登録します:
+
+```tsx
+import { ComparisonLayout, useMultiComparison, useComparisonScrollSyncGroup, useMultiComparisonNavigation } from '@ishibashi0112/comparison-grid';
+
+const multi = useMultiComparison({ sides, getMatchKey: (r) => r.id, compareFields, alignRows: true });
+const group = useComparisonScrollSyncGroup<Row>();                       // 任意: 差分ジャンプと共有するとき
+const nav = useMultiComparisonNavigation({ comparison: multi, alignRows: true, getHandle: group.getHandle });
+
+<ComparisonLayout.Root<Row> comparison={multi} columns={columns} keyColumnKeys={['id']} scrollSyncGroup={group} showDiffLabelColumn>
+  {multi.sides.map((side) => (
+    <ComparisonLayout.Pane key={side.id} side={side.id}>
+      <ComparisonLayout.Header>{side.label}</ComparisonLayout.Header>
+      <ComparisonLayout.Grid<Row> gridProps={{ height: 480 }} />
+    </ComparisonLayout.Pane>
+  ))}
+</ComparisonLayout.Root>;
 ```
 
 View 層も headless です。`useComparisonPane` は `ComparisonPane` がグリッドへ配線するものすべてを「自分でスプレッドする props」として返し、`useComparisonScrollSync` は両側ぶんの合成済み `ref` / `onScroll` を返します。DOM / ヘッダー / 配置を自分で決めたいときに使います:

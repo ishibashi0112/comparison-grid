@@ -1,6 +1,6 @@
 # CLAUDE.md — comparison-grid 開発ガイド
 
-`@ishibashi0112/spreadsheet-grid` を表示コアに使う「2 構成比較」コンポーネントライブラリ(`@ishibashi0112/comparison-grid`)。**すべて日本語で対応する。** 設計判断の経緯・spreadsheet-grid への提案・Phase 2 は `docs/DESIGN_NOTES.md`、公開 API は `src/components/comparison-grid/API_REFERENCE.md` を参照。
+`@ishibashi0112/spreadsheet-grid` を表示コアに使う「構成比較」(2 構成 + 基準対各構成の N 構成)コンポーネントライブラリ(`@ishibashi0112/comparison-grid`)。**すべて日本語で対応する。** 設計判断の経緯・spreadsheet-grid への提案・Phase 2 は `docs/DESIGN_NOTES.md`、公開 API は `src/components/comparison-grid/API_REFERENCE.md` を参照。
 
 ## 技術スタック
 
@@ -62,7 +62,10 @@ src/components/comparison-grid/
   hooks/useComparisonPane.ts ヘッドレス層: ペインの差分合成(SpreadsheetGrid へスプレッドできる gridProps を返す。ComparisonPane の本体)
   hooks/useComparisonScrollSync.ts ヘッドレス層: スクロール同期。useComparisonScrollSyncGroup(ハンドル登録 + broadcast)/ useSyncedGridProps / useComparisonScrollSyncMany(N 構成)/ useComparisonScrollSync(2-way 便利版)
   view/ComparisonPane.tsx 片側 1 ペイン(useComparisonPane + ラッパー DOM の薄い包み)
-  view/ComparisonView.tsx 2 ペインレイアウト(useComparisonScrollSync を配線)
+  view/ComparisonLayout.tsx 合成コンポーネント Root / Pane / Header / Grid(Root が Context で配る。ペイン数は JSX の子の数)
+  view/comparisonLayoutContext.ts 合成コンポーネントの Context / useComparisonLayout / モデル正規化(react-refresh のためコンポーネントと分離)
+  view/comparisonLayoutNamespace.ts 名前空間 ComparisonLayout = { Root, Pane, Header, Grid }
+  view/ComparisonView.tsx 2 ペインレイアウト(合成コンポーネントで組んだプリセット。props / DOM は従来どおり)
   styles.css            .cmpg-* クラス + --cmpg-* トークン(未レイヤー / :where)
   index.ts              公開バレル
 src/App.tsx / src/demo/  ss2602(部品構成比較)再現デモ

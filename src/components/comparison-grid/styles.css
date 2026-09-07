@@ -48,10 +48,13 @@
   --cmpg-rollup-row-hover-bg: rgba(250, 204, 21, 0.12);
 }
 
-/* レイアウト */
+/* レイアウト。横並びは子(ペイン)の数だけ等幅カラム: 明示 2 カラム + 暗黙カラム(3 ペイン以上)を
+   grid-auto-flow: column で横へ流す。ComparisonView(2 ペイン)も合成コンポーネント(N ペイン)も同じ規則。 */
 .cmpg-view {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: var(--cmpg-view-gap);
   min-width: 0;
   min-height: 0;
@@ -64,6 +67,7 @@
    gridProps={{ height: '100%' }} を併用する。 */
 .cmpg-view--vertical {
   grid-template-columns: minmax(0, 1fr);
+  grid-auto-flow: row;
 }
 
 .cmpg-pane {

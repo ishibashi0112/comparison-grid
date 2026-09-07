@@ -6,8 +6,8 @@
 import { useMemo } from 'react';
 import type { GridColumn } from '@ishibashi0112/spreadsheet-grid';
 import type {
+  ComparisonAnyRowDiff,
   ComparisonPaneGridProps,
-  ComparisonRowDiff,
   UseComparisonPaneOptions,
   UseComparisonPaneResult,
 } from '../model/types';
@@ -95,7 +95,7 @@ export function useComparisonPane<T extends object>(
 
   const getDiff = useMemo(
     () =>
-      (row: T): ComparisonRowDiff<T> | undefined =>
+      (row: T): ComparisonAnyRowDiff<T> | undefined =>
         diffs.get(row),
     [diffs],
   );
