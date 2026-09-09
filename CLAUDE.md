@@ -17,7 +17,7 @@
 - eslint baseline は **0 errors / 0 warnings**。render 中の `ref.current` 書き込みは使わない(参照安定化は `hooks/useStableValue.ts` の条件付き render 中 setState パターン)。
 - 利用側の行 `T` に書き込まない(サイドカー方式: 差分は `Map<T, ComparisonRowDiff<T>>`)。グリッドへは `T[]` をそのまま渡す。
 - `enable*` / `show*` の命名規約(spreadsheet-grid と同じ)。既定ラベルは日本語。
-- 公開型を変えたら `API_REFERENCE.md` と README(英日)を同じ作業で更新する。使用例(`examples/`)は型検査・描画テストの対象なので、API を変えれば落ちる(直すこと)。
+- 公開型を変えたら `API_REFERENCE.md` と README(英日)を同じ作業で更新する。使用例(`examples/`)は型検査・描画テストの対象なので、API を変えれば落ちる(直すこと)。`skills/comparison-grid/SKILL.md` の「用途 → API」表と落とし穴も同期する。`llms*.txt` は生成物(`pnpm run docs:llms`)。
 
 ## ワークフロー
 
@@ -69,6 +69,8 @@ src/components/comparison-grid/
   styles.css            .cmpg-* クラス + --cmpg-* トークン(未レイヤー / :where)
   index.ts              公開バレル
 src/App.tsx / src/demo/  ss2602(部品構成比較)再現デモ。App.tsx はモード切替(2 構成 = 木モード / N 構成 = demo/MultiComparisonDemo.tsx の合成コンポーネント + 平坦比較)
+skills/comparison-grid/SKILL.md 利用側プロジェクト向けの Claude Code スキル(用途 → API / 最小コード / 落とし穴)。npm 配布物に同梱
+scripts/emit-llms.mjs   llms.txt / llms-full.txt(README + API_REFERENCE + examples/README + SKILL の結合)を生成。build:lib の最終ステップ。手で編集しない
 examples/               使用例(01〜08 + data.ts + README)。利用側と同じ `@ishibashi0112/comparison-grid` で import する(tsconfig.app.json の paths / vite・vitest の alias でソースへ解決)。examples.test.tsx で描画テスト。npm 配布物に同梱(package.json files)
 ```
 

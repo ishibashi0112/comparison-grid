@@ -198,7 +198,13 @@
 - API_REFERENCE の先頭に「やりたいこと → 使う API → 使用例」の表、層の図(プリセット → 合成コンポーネント → ヘッドレス → 純ロジック)、落とし穴 5 点を置いた。約 700 行のリファレンスを上から読まなくても入口が分かるようにするため(人にも AI にも)。
 - 公開フック 8 本と `ComparisonView` / `ComparisonLayoutRoot` に JSDoc(`@example` つき)。`tsc -p tsconfig.lib.json` の宣言出力に写るので、`.d.ts` 経由でエディタ上の補完 / AI にも届く。
 
-## 6. 検討中(2026-09-09。batch 19〜25 で 6-3 の 1〜5 + (B) + 使用例を実装済み — 残りは 6 の木モード N 化と AI 向けドキュメント)
+### 実装済み(2026-09-09・batch 27〜28。AI 向け: `skills/comparison-grid/SKILL.md` と `llms.txt` / `llms-full.txt`)
+
+- **SKILL.md**(Claude Code のスキル形式。frontmatter に name / description)。利用側が自分のプロジェクトの `.claude/skills/` にコピーして使う前提で、一次情報(同梱の examples / llms-full.txt / d.ts)への導線、用途 → API 表、最小コード、落とし穴 8 点、差分型の形を書いた。API_REFERENCE の索引と同じ表を持つため、公開 API を変えたら両方を直す(CLAUDE.md の厳守事項に追記)。
+- **llms.txt / llms-full.txt** は `scripts/emit-llms.mjs` の生成物。`build:lib` の最終ステップに組み込み(`prepublishOnly` → `build:lib` で publish 時に必ず最新になる)。手で編集しない。`llms-full.txt` は README + API_REFERENCE + examples/README + SKILL の結合で、AI が 1 ファイルで全体を読める。
+- npm 配布物: `files` に `examples` / `skills` / `llms.txt` / `llms-full.txt` を追加。README(英日)に「AI アシスタント向け」節。
+
+## 6. 検討中(2026-09-09。batch 19〜28 で 6-3 の 1〜5 + (B) + ドキュメント整備を実装済み — 残りは 6 の木モード N 化)
 
 ### 6-1. N 構成比較(3・4 構成へ拡張)
 

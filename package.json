@@ -30,7 +30,10 @@
   ],
   "files": [
     "dist",
-    "examples"
+    "examples",
+    "skills",
+    "llms.txt",
+    "llms-full.txt"
   ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -54,7 +57,8 @@
   "scripts": {
     "dev": "vp dev",
     "build": "tsc -b && vp build",
-    "build:lib": "vp build --config vite.lib.config.ts && tsc -p tsconfig.lib.json && node scripts/emit-layer-css.mjs",
+    "build:lib": "vp build --config vite.lib.config.ts && tsc -p tsconfig.lib.json && node scripts/emit-layer-css.mjs && node scripts/emit-llms.mjs",
+    "docs:llms": "node scripts/emit-llms.mjs",
     "build:types": "tsc -p tsconfig.lib.json",
     "prepublishOnly": "pnpm run build:lib",
     "lint": "eslint .",

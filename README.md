@@ -376,6 +376,10 @@ const { summary } = comparison;
 
 Diffs are looked up by row **object identity**. Pass the same arrays from `useComparison` (`visibleLeft` / `visibleRight`) to the panes and do not clone rows in between.
 
+## For AI assistants
+
+The package ships what an assistant needs to use the library correctly: `llms.txt` (index) and `llms-full.txt` (README + API reference + examples index in one file), the type-checked [`examples/`](./examples/README.md), and a Claude Code skill at [`skills/comparison-grid/SKILL.md`](./skills/comparison-grid/SKILL.md) — copy that folder into your project's `.claude/skills/` and Claude Code will know the API, the layer to pick for a given task, and the pitfalls. Public hooks carry `@example` JSDoc in `dist/*.d.ts` for editor assistants.
+
 ## API reference
 
 See [`API_REFERENCE.md`](./src/components/comparison-grid/API_REFERENCE.md) (Japanese) for every prop, type and CSS token.
@@ -753,6 +757,10 @@ const { summary } = comparison;
 #### 行の同一性を保つ
 
 差分は行**オブジェクトの同一性**で引きます。`useComparison` が返す配列(`visibleLeft` / `visibleRight`)をそのままペインへ渡し、途中で行を複製しないでください。
+
+### AI アシスタント向け
+
+AI がこのライブラリを正しく使うための材料をパッケージに同梱しています: `llms.txt`(目次)と `llms-full.txt`(README + API リファレンス + 使用例索引の全文)、型検査済みの [`examples/`](./examples/README.md)、Claude Code 用スキル [`skills/comparison-grid/SKILL.md`](./skills/comparison-grid/SKILL.md)。スキルのフォルダを利用側プロジェクトの `.claude/skills/` にコピーすると、Claude Code が API・用途に応じた層の選び方・落とし穴を把握した状態になります。公開フックの `@example` 付き JSDoc は `dist/*.d.ts` に含まれ、エディタ上の AI にも届きます。
 
 ### API リファレンス
 
