@@ -252,6 +252,8 @@ const rightPane = useComparisonPane<Row>({ /* same with the right side */ });
 
 ## Recipes
 
+Complete, copy-paste-ready examples live in [`examples/`](./examples/README.md) (shipped in the package). They use the same import path as your code and are type-checked and rendered in tests, so they never drift from the API: two-way basics, hierarchical BOM comparison, three sides against a base, `mode: 'all'`, a 2×2 layout with shared scroll sync and diff navigation, a fully headless grid, CSV export, and manual input.
+
 ### Swap the match key at runtime (e.g. "compare by representative part number")
 
 The core knows nothing about your domain. Express alternative matching rules by swapping `getMatchKey`:
@@ -627,6 +629,8 @@ const rightPane = useComparisonPane<Row>({ /* 右側も同様 */ });
 `leftPane.gridProps.className` には `cmpg-grid` が含まれ、`--cmpg-*` トークンはそこにも定義されているので、`.cmpg-pane` ラッパー無しでもハイライトが効きます。`renderCell` の中では `leftPane.getDiff(row)` で差分を引けます。
 
 ### レシピ
+
+そのままコピーして使える完全な例は [`examples/`](./examples/README.md) にあります(パッケージにも同梱)。利用側と同じ import パスで書かれ、型検査と描画テストの対象なので API と食い違いません: 2 構成の基本 / 階層比較 / 基準対 3 構成 / `mode: 'all'` / 2×2 配置 + 同期と差分ジャンプの共有 / 完全ヘッドレス / CSV エクスポート / マニュアル入力。
 
 #### 突き合わせキーを実行時に切り替える(例: 代表品番比較)
 

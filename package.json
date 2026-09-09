@@ -29,7 +29,8 @@
     "**/*.css"
   ],
   "files": [
-    "dist"
+    "dist",
+    "examples"
   ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

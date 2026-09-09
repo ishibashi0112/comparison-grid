@@ -17,7 +17,7 @@
 - eslint baseline は **0 errors / 0 warnings**。render 中の `ref.current` 書き込みは使わない(参照安定化は `hooks/useStableValue.ts` の条件付き render 中 setState パターン)。
 - 利用側の行 `T` に書き込まない(サイドカー方式: 差分は `Map<T, ComparisonRowDiff<T>>`)。グリッドへは `T[]` をそのまま渡す。
 - `enable*` / `show*` の命名規約(spreadsheet-grid と同じ)。既定ラベルは日本語。
-- 公開型を変えたら `API_REFERENCE.md` と README(英日)を同じ作業で更新する。
+- 公開型を変えたら `API_REFERENCE.md` と README(英日)を同じ作業で更新する。使用例(`examples/`)は型検査・描画テストの対象なので、API を変えれば落ちる(直すこと)。
 
 ## ワークフロー
 
@@ -69,6 +69,7 @@ src/components/comparison-grid/
   styles.css            .cmpg-* クラス + --cmpg-* トークン(未レイヤー / :where)
   index.ts              公開バレル
 src/App.tsx / src/demo/  ss2602(部品構成比較)再現デモ。App.tsx はモード切替(2 構成 = 木モード / N 構成 = demo/MultiComparisonDemo.tsx の合成コンポーネント + 平坦比較)
+examples/               使用例(01〜08 + data.ts + README)。利用側と同じ `@ishibashi0112/comparison-grid` で import する(tsconfig.app.json の paths / vite・vitest の alias でソースへ解決)。examples.test.tsx で描画テスト。npm 配布物に同梱(package.json files)
 ```
 
 - jsdom で実グリッドの行 / セルを描画させるには、`@ishibashi0112/spreadsheet-grid/testing` の `installJsdomLayoutStubs()`(v0.29.0〜)を `beforeAll` で呼ぶ(`view/ComparisonView.test.tsx` 参照。返り値のアンインストーラを `afterAll` で呼ぶ)。no-op の ResizeObserver だと列が 1 本も描画されない。

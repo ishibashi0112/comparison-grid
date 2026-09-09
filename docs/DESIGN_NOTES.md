@@ -186,7 +186,14 @@
 - デモ: 「全構成一致判定」トグル(ON で基準ラジオを無効化・バッジ非表示・概要文を切り替え)。
 - テスト 229(+13)。
 
-## 6. 検討中(2026-09-09。batch 19〜24 で 6-3 の 1〜5 + (B) を実装済み — 残りは 6 の木モード N 化)
+### 実装済み(2026-09-09・batch 25。使用例集 `examples/`)
+
+- **目的**: 人と AI がライブラリを把握するための「腐らないドキュメント」。例は利用側と同じ import パス(`@ishibashi0112/comparison-grid`)で書き、`tsconfig.app.json` の `paths` と vite / vitest の `resolve.alias` でソースへ解決する。型検査(`tsc -b` / `typecheck:test`)と描画テスト(`examples/examples.test.tsx`。`installJsdomLayoutStubs` で実グリッドを描画)の対象なので、公開 API を変えれば落ちる。
+- 8 本: 01 2-way 基本 / 02 階層比較 / 03 基準対 3 構成 + `ComparisonLayout` / 04 `mode: 'all'` + `useComparisonLayout` の自作パーツ / 05 2×2 配置 + 同期グループを差分ジャンプと共有 / 06 完全ヘッドレス(自前 DOM の `SpreadsheetGrid`)/ 07 CSV エクスポート / 08 マニュアル入力(`useManualRows`)。共通データは `data.ts`。
+- npm 配布物に同梱(`files: ["dist", "examples"]`)。AI 向けの SKILL / llms.txt からもここを参照する予定。
+- 見送り: デモ画面への「使用例」タブ(必要になったら `src/App.tsx` にモードを足すだけ)。
+
+## 6. 検討中(2026-09-09。batch 19〜25 で 6-3 の 1〜5 + (B) + 使用例を実装済み — 残りは 6 の木モード N 化と AI 向けドキュメント)
 
 ### 6-1. N 構成比較(3・4 構成へ拡張)
 

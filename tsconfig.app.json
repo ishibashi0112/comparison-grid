@@ -20,8 +20,13 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    /* 使用例(examples/)を利用側と同じ import パスで書くためのエイリアス。vite.config.ts / vitest.config.ts と対応。 */
+    "paths": {
+      "@ishibashi0112/comparison-grid": ["./src/components/comparison-grid/index.ts"]
+    }
   },
-  "include": ["src"],
+  "include": ["src", "examples"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }
