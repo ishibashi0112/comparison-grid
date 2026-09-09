@@ -136,3 +136,21 @@ describe('useMultiComparison', () => {
     expect(result.current.getDiff(planA[2])?.label).toBe('基準のみ');
   });
 });
+
+describe("useMultiComparison: mode 'all'", () => {
+  it('mode / axisId を返し、差分のみは全ペインの揺れを拾い、整列は先頭を軸にする', () => {
+    const { result } = renderHook(() =>
+      useMultiComparison<Row>({ sides, getMatchKey, compareFields, mode: 'all', showDiffOnly: true, alignRows: true }),
+    );
+    expect(result.current.mode).toBe('all');
+    expect(result.current.baseId).toBeUndefined();
+    expect(result.current.axisId).toBe('base');
+    // base: A(same) / B(a と違う) / C(a・b に無い)。a: A / B' / D(a のみ)。b: A / B。
+    //   整列 + 差分のみ → A の位置だけ除かれ B / C / D の 3 行。b のペインの B は (A) なら same だったが、a と違うので差分。
+    const b = result.current.getSide('b')!;
+    expect(b.visibleRows).toHaveLength(3);
+    expect(result.current.getDiff(planB[1])?.kind).toBe('field-diff');
+    expect(result.current.getDiff(planB[1])?.label).toBe('案1: 数量違い');
+    expect(result.current.sides.every((side) => !side.isBase)).toBe(true);
+  });
+});

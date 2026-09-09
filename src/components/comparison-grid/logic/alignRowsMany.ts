@@ -1,8 +1,8 @@
 // N 構成の整列モードの純ロジックです(React / グリッド非依存)。alignComparisonRows の N 構成版。
 //   compareMany() の結果を「同じ行位置 = 同じ突き合わせ相手」になるよう構成ごとの配列へ並べ直し、
 //   欠損側にプレースホルダ行を挿入します。
-//   - 並び順: 基準の行順を軸に、各構成の対応行(基準行の counterparts)を同じ行位置へ置く。
-//     基準に無い行は「構成の入力順 → その構成内の行順」で末尾に足し、同じ突き合わせキーを持つ他構成の
+//   - 並び順: 軸の構成(mode 'base' では基準、'all' では先頭)の行順に、各構成の対応行(軸行の counterparts)を
+//     同じ行位置へ置く。軸に無い行は「構成の入力順 → その構成内の行順」で末尾に足し、同じ突き合わせキーを持つ他構成の
 //     行は同じ行位置にまとめる(基準対各構成では比較されないが、目視で並ぶよう位置だけ揃える)。
 //   - キー重複で複数の基準行が同じ相手を指す場合、相手は先に対になった行が消費し、残りはプレースホルダと組む。
 //   - プレースホルダは行ごとに新しいオブジェクト(既定 `{} as T`)で、差分 Map には載らない。
@@ -22,10 +22,11 @@ export function alignComparisonRowsMany<T>(
   options?: AlignComparisonRowsManyOptions<T>,
 ): AlignComparisonRowsManyResult<T> {
   const createPlaceholderRow = options?.createPlaceholderRow ?? defaultCreatePlaceholderRow;
-  const { baseId, sides } = result;
-  const base = result.sidesById.get(baseId);
-  if (!base) throw new Error(`alignComparisonRowsMany: baseId "${baseId}" が結果にありません。`);
-  const others = sides.filter((side) => !side.isBase);
+  // 軸 = mode 'base' では基準、mode 'all' では先頭の構成。
+  const { axisId, sides } = result;
+  const base = result.sidesById.get(axisId);
+  if (!base) throw new Error(`alignComparisonRowsMany: axisId "${axisId}" が結果にありません。`);
+  const others = sides.filter((side) => side.id !== axisId);
 
   // 行位置ごとの「構成 ID → 行」。
   const positions: Map<ComparisonSideId, T>[] = [];
@@ -33,7 +34,7 @@ export function alignComparisonRowsMany<T>(
 
   // 1) 基準の行順を軸に対を作る。
   for (const entry of base.annotated) {
-    const cells = new Map<ComparisonSideId, T>([[baseId, entry.row]]);
+    const cells = new Map<ComparisonSideId, T>([[axisId, entry.row]]);
     for (const other of others) {
       const counterpart = entry.diff.counterparts.get(other.id);
       if (counterpart !== undefined && !consumed.has(counterpart)) {

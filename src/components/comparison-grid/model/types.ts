@@ -562,6 +562,12 @@ export type UseTreeComparisonResult<T> = UseComparisonResult<T> & {
 /** 構成(ペイン)の識別子。利用側が付ける任意の文字列(重複不可)。 */
 export type ComparisonSideId = string;
 
+/** N 構成比較の意味論。
+ *  - `'base'`(既定): 基準を 1 つ選び、他の各構成を基準と比較する。基準以外のペインは基準との違いだけを示す。
+ *  - `'all'`: 基準なし。行は全構成に存在し、全構成でフィールドが一致するときだけ same。どのペインでも
+ *    揺れのある行は差分になり、内訳(missingIn / fieldDiffs / bySide)は「自分から見た他の各構成」。 */
+export type ComparisonMultiMode = 'base' | 'all';
+
 /** N 構成比較の入力 1 構成ぶん。 */
 export type ComparisonSideInput<T> = {
   id: ComparisonSideId;
@@ -570,7 +576,7 @@ export type ComparisonSideInput<T> = {
   label?: string;
 };
 
-/** 構成の情報(入力順・基準フラグつき)。ラベル生成のコンテキストと結果に載る。 */
+/** 構成の情報(入力順・基準フラグつき)。ラベル生成のコンテキストと結果に載る。mode 'all' では isBase は全構成 false。 */
 export type ComparisonSideInfo = {
   id: ComparisonSideId;
   label: string;
@@ -578,9 +584,10 @@ export type ComparisonSideInfo = {
 };
 
 /** N 構成の行差分種別。
- *  - `only`: 突き合わせ相手が無い(基準ペインではどの構成にも無い / 他ペインでは基準に無い)。
- *  - `partial`: 基準ペインのみ。一部の構成に無いが、存在する構成とは一致。
- *  - `field-diff`: いずれかの相手とフィールドが違う(基準ペインでは一部の構成に無い場合も含む。`missingIn` を参照)。 */
+ *  - `only`: 突き合わせ相手が無い(基準ペイン / mode 'all' では他のどの構成にも無い。base モードの他ペインでは基準に無い)。
+ *  - `partial`: 一部の構成に無いが、存在する構成とは一致(基準ペイン / mode 'all' の各ペイン)。
+ *  - `field-diff`: いずれかの相手とフィールドが違う(一部の構成に無い場合も含む。`missingIn` を参照)。
+ *  優先順は field-diff > partial > only > same。 */
 export type ComparisonMultiDiffKind = 'same' | 'only' | 'partial' | 'field-diff';
 
 /** N 構成比較の 1 行ぶんの差分情報。 */
@@ -592,14 +599,15 @@ export type ComparisonMultiRowDiff<T> = {
   /** 表示用ラベル。same は ''。 */
   label: string;
   matchKey: string;
-  /** 差分のあった CompareField.key(基準ペインでは各構成との和集合)。 */
+  /** 差分のあった CompareField.key(基準ペイン / mode 'all' では他の各構成との和集合)。 */
   fieldDiffs: ReadonlySet<string>;
-  /** 基準ペインで、この行が無い構成の ID(他ペインでは常に空)。 */
+  /** この行が無い構成の ID(基準ペイン / mode 'all' の各ペイン。base モードの他ペインでは常に空)。 */
   missingIn: ReadonlySet<ComparisonSideId>;
-  /** 突き合わせ相手(構成 ID → 行)。基準ペインでは相手が居る構成ぶん、他ペインでは基準(キー baseId)のみ。 */
+  /** 突き合わせ相手(構成 ID → 行)。基準ペイン / mode 'all' では相手が居る構成ぶん、base モードの他ペインでは
+   *  基準(キー baseId)のみ。 */
   counterparts: ReadonlyMap<ComparisonSideId, T>;
-  /** 内訳: 基準ペインでは構成 ID → 基準とその構成の 2-way 差分(基準側の注釈)、
-   *  他ペインでは baseId → 基準との 2-way 差分(自側の注釈)の 1 件。 */
+  /** 内訳: 構成 ID → その構成との 2-way 差分(自側 = left の注釈。left-only は「その構成に無い」)。
+   *  base モードの他ペインでは baseId → 基準との 2-way 差分(自側 = right の注釈)の 1 件。 */
   bySide: ReadonlyMap<ComparisonSideId, ComparisonRowDiff<T>>;
 };
 
@@ -626,6 +634,7 @@ export type ComparisonMultiLabels = Pick<ComparisonLabels, 'fieldDiffSeparator' 
 
 /** N 構成比較の formatDiffLabel へ渡すコンテキスト。 */
 export type MultiDiffLabelContext<T> = {
+  mode: ComparisonMultiMode;
   sideId: ComparisonSideId;
   isBase: boolean;
   kind: ComparisonMultiDiffKind;
@@ -640,9 +649,11 @@ export type MultiDiffLabelContext<T> = {
   labels: ComparisonMultiLabels;
 };
 
-/** compareMany() のオプション。CompareOptions と同じ突き合わせ設定 + 基準の指定。 */
+/** compareMany() のオプション。CompareOptions と同じ突き合わせ設定 + 意味論と基準の指定。 */
 export type CompareManyOptions<T> = Omit<CompareOptions<T>, 'formatDiffLabel' | 'labels'> & {
-  /** 基準にする構成の ID(既定は sides[0].id)。 */
+  /** 意味論(既定 'base')。 */
+  mode?: ComparisonMultiMode;
+  /** 基準にする構成の ID(既定は sides[0].id)。mode 'all' では無視される。 */
   baseId?: ComparisonSideId;
   formatDiffLabel?: (ctx: MultiDiffLabelContext<T>) => string;
   labels?: Partial<ComparisonMultiLabels>;
@@ -670,11 +681,15 @@ export type ComparisonMultiSideResult<T> = ComparisonSideInfo & {
 
 /** compareMany() の戻り値。 */
 export type ComparisonMultiResult<T> = {
-  baseId: ComparisonSideId;
+  mode: ComparisonMultiMode;
+  /** 基準の構成 ID(mode 'base' のみ。'all' では undefined)。 */
+  baseId?: ComparisonSideId;
+  /** 整列 / 差分ジャンプの軸になる構成(mode 'base' では baseId、'all' では sides[0].id)。 */
+  axisId: ComparisonSideId;
   /** 入力順の構成別結果。 */
   sides: readonly ComparisonMultiSideResult<T>[];
   sidesById: ReadonlyMap<ComparisonSideId, ComparisonMultiSideResult<T>>;
-  /** 基準以外の構成 ID → 基準との 2-way 結果(left = 基準、right = その構成)。 */
+  /** mode 'base': 基準以外の構成 ID → 基準との 2-way 結果(left = 基準、right = その構成)。mode 'all' では空。 */
   pairs: ReadonlyMap<ComparisonSideId, ComparisonResult<T>>;
   /** いずれかの構成に same 以外の行があるか。 */
   hasAnyDiff: boolean;
@@ -783,8 +798,8 @@ export type ComparisonMultiDiffStop<T> = {
 };
 
 export type UseMultiComparisonNavigationOptions<T> = {
-  /** useMultiComparison の戻り値(sides / baseId を使用)。 */
-  comparison: Pick<UseMultiComparisonResult<T>, 'sides' | 'baseId'>;
+  /** useMultiComparison の戻り値(sides / axisId を使用)。 */
+  comparison: Pick<UseMultiComparisonResult<T>, 'sides' | 'axisId'>;
   /** alignRows 利用時に true。行の無い構成も同じ行位置へスクロールする。 */
   alignRows?: boolean;
   /** scrollToRow の align(既定 'center')。 */
@@ -797,7 +812,7 @@ export type UseMultiComparisonNavigationResult<T> = {
   /** 構成 ID → グリッドへ `gridProps={{ ref }}` で渡す ref(構成 ID の並びが変わらない限り安定)。 */
   refs: ReadonlyMap<ComparisonSideId, RefObject<SpreadsheetGridHandle<T> | null>>;
   getRef: (sideId: ComparisonSideId) => RefObject<SpreadsheetGridHandle<T> | null> | undefined;
-  /** 停止位置(基準の行順 → 基準に無い行を構成順 → 行順で末尾。alignRows では行位置順)。 */
+  /** 停止位置(軸の構成の行順 → 軸に無い行を構成順 → 行順で末尾。alignRows では行位置順)。 */
   diffStops: readonly ComparisonMultiDiffStop<T>[];
   diffCount: number;
   /** 現在の停止位置(未移動は -1)。sides が変わるとリセットされる。 */

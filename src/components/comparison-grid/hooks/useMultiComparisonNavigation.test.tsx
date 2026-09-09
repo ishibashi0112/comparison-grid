@@ -165,3 +165,21 @@ describe('useMultiComparisonNavigation', () => {
     expect(result.current.diffCount).toBe(3); // B' / C / D が a のみ
   });
 });
+
+describe("useMultiComparisonNavigation: mode 'all'", () => {
+  it('先頭の構成を軸に停止を列挙し、他ペインどうしの揺れも停止になる', () => {
+    const { result } = renderHook(() => {
+      const comparison = useMultiComparison<Row>({ sides, getMatchKey, compareFields, mode: 'all' });
+      return useMultiComparisonNavigation<Row>({ comparison });
+    });
+    // base: A(same) / B(a と違う) / C(b に無い)。a: A / B' / C / D。b: A / B / E。
+    //   軸 base の停止: B / C。軸に無い行: D(a のみ)/ E(b のみ)。
+    expect(result.current.diffCount).toBe(4);
+    const [b, c, d, e] = result.current.diffStops;
+    expect(b.kind).toBe('field-diff');
+    expect([...b.indices.keys()]).toEqual(['base', 'a', 'b']);
+    expect(c.kind).toBe('partial');
+    expect([...d.indices]).toEqual([['a', 3]]);
+    expect([...e.indices]).toEqual([['b', 2]]);
+  });
+});

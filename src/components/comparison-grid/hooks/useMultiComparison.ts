@@ -39,6 +39,7 @@ export function useMultiComparison<T>(
   const {
     showDiffOnly = false,
     getMatchKey,
+    mode,
     baseId,
     formatDiffLabel,
     duplicateKeyPolicy = 'last',
@@ -54,12 +55,13 @@ export function useMultiComparison<T>(
       compareMany(sides, {
         getMatchKey,
         compareFields,
+        mode,
         baseId,
         formatDiffLabel,
         labels,
         duplicateKeyPolicy,
       }),
-    [sides, getMatchKey, compareFields, baseId, formatDiffLabel, labels, duplicateKeyPolicy],
+    [sides, getMatchKey, compareFields, mode, baseId, formatDiffLabel, labels, duplicateKeyPolicy],
   );
 
   const hasAllSides = sides.length >= 2 && sides.every((side) => side.rows.length > 0);
@@ -122,7 +124,9 @@ export function useMultiComparison<T>(
 
   return useMemo(
     () => ({
+      mode: result.mode,
       baseId: result.baseId,
+      axisId: result.axisId,
       pairs: result.pairs,
       hasAnyDiff: result.hasAnyDiff,
       sides: visibleSides,

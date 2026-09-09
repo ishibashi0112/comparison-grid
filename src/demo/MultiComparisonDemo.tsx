@@ -12,6 +12,7 @@ import {
   useMultiComparisonNavigation,
   type CompareField,
   type ComparisonGridProps,
+  type ComparisonMultiMode,
   type ComparisonMultiVisibleSide,
   type ComparisonSideInput,
 } from '../components/comparison-grid';
@@ -38,9 +39,19 @@ const MAX_SIDES = 5;
 
 const sideIdOf = (index: number) => `side-${index}`;
 
-function SideHeader({ side, rows }: { side: ComparisonMultiVisibleSide<BomRow>; rows: readonly BomRow[] }) {
+function SideHeader({
+  side,
+  rows,
+  mode,
+}: {
+  side: ComparisonMultiVisibleSide<BomRow>;
+  rows: readonly BomRow[];
+  mode: ComparisonMultiMode;
+}) {
   const root = rows[0];
   const { summary } = side;
+  // 「一部無し」(partial)は基準ペインと mode 'all' の各ペインでだけ起こる。
+  const showPartial = side.isBase || mode === 'all';
   return (
     <>
       <h3 className="demo-pane-title">
@@ -50,7 +61,7 @@ function SideHeader({ side, rows }: { side: ComparisonMultiVisibleSide<BomRow>; 
       <p className="demo-pane-spec">
         {root ? `仕様: ${root.rootItemSpec} ・ ` : ''}
         {`${summary.total} 件(同一 ${summary.same} / 無し ${summary.only}${
-          side.isBase ? ` / 一部無し ${summary.partial}` : ''
+          showPartial ? ` / 一部無し ${summary.partial}` : ''
         } / 項目違い ${summary.fieldDiff})`}
       </p>
     </>
@@ -61,6 +72,7 @@ export function MultiComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cv
   const [codes, setCodes] = useState<string[]>([...BOM_MULTI_PRESETS[0].codes]);
   const [rowsBySide, setRowsBySide] = useState<readonly BomRow[][]>([]);
   const [baseIndex, setBaseIndex] = useState(0);
+  const [mode, setMode] = useState<ComparisonMultiMode>('base');
   const [isLoading, setIsLoading] = useState(false);
   const [showDiffOnly, setShowDiffOnly] = useState(false);
   const [alignRows, setAlignRows] = useState(false);
@@ -78,9 +90,10 @@ export function MultiComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cv
     [codes, rowsBySide],
   );
 
-  // 2. 比較: 基準対各構成。差分のみ / 整列はフックが導出する。
+  // 2. 比較: mode 'base' = 基準対各構成 / 'all' = 全構成一致判定。差分のみ / 整列はフックが導出する。
   const comparison = useMultiComparison<BomRow>({
     sides,
+    mode,
     baseId: sideIdOf(Math.min(baseIndex, codes.length - 1)),
     getMatchKey,
     compareFields: COMPARE_FIELDS,
@@ -149,14 +162,15 @@ export function MultiComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cv
         <form className="demo-form" onSubmit={handleSubmit}>
           {codes.map((code, index) => (
             <span key={sideIdOf(index)} className="demo-side-input">
-              <label className="demo-toggle" title="基準にする">
+              <label className="demo-toggle" title={mode === 'all' ? '全構成一致では基準を選びません' : '基準にする'}>
                 <input
                   type="radio"
                   name="demo-base"
-                  checked={index === baseIndex}
+                  checked={mode === 'base' && index === baseIndex}
+                  disabled={mode === 'all'}
                   onChange={() => setBaseIndex(index)}
                 />
-                {index === baseIndex ? '基準' : `案`}
+                {mode === 'all' ? '構成' : index === baseIndex ? '基準' : '案'}
               </label>
               <input
                 className="demo-input"
@@ -208,6 +222,14 @@ export function MultiComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cv
               </button>
             ))}
           </span>
+          <label className="demo-toggle" title="全構成に存在し、全構成で一致する行だけを同一とみなす(基準なし)">
+            <input
+              type="checkbox"
+              checked={mode === 'all'}
+              onChange={(event) => setMode(event.target.checked ? 'all' : 'base')}
+            />
+            全構成一致判定
+          </label>
           <label className="demo-toggle">
             <input
               type="checkbox"
@@ -265,7 +287,11 @@ export function MultiComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cv
         </form>
         <p className="demo-summary">
           {hasData
-            ? `平坦比較(キー = 品目コード)。基準「${comparison.getSide(comparison.baseId)?.label ?? ''}」に対して他の各構成を比較しています。` +
+            ? `平坦比較(キー = 品目コード)。${
+                comparison.mode === 'all'
+                  ? '全構成一致判定: 全構成に存在し全構成で一致する行だけが同一で、どのペインでも揺れのある行は差分になります。'
+                  : `基準「${comparison.getSide(comparison.baseId ?? comparison.axisId)?.label ?? ''}」に対して他の各構成を比較しています。`
+              }` +
               (!comparison.hasAllSides ? '(空の構成があるため「差分のみ」は無効)' : '') +
               (duplicateCount > 0 ? ' ※ キー重複あり(同じ品目コードが複数行)' : '')
             : `品番を入力して「展開」を押すか、プリセットを選んでください(登録済み: ${BOM_ITEM_CODES.join(' / ')})。`}
@@ -287,7 +313,7 @@ export function MultiComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cv
           {comparison.sides.map((side) => (
             <ComparisonLayout.Pane key={side.id} side={side.id}>
               <ComparisonLayout.Header>
-                <SideHeader side={side} rows={side.rows} />
+                <SideHeader side={side} rows={side.rows} mode={comparison.mode} />
               </ComparisonLayout.Header>
               <ComparisonLayout.Grid<BomRow> />
             </ComparisonLayout.Pane>

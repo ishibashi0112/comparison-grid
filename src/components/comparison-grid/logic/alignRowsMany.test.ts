@@ -141,3 +141,30 @@ describe('alignComparisonRowsMany', () => {
     });
   });
 });
+
+describe("alignComparisonRowsMany: mode 'all'", () => {
+  it('先頭の構成を軸に整列し、軸に無い行は同キーどうしを同じ行位置にまとめる', () => {
+    const x = [row('A', 1), row('B', 1)];
+    const p1 = [row('B', 2), row('A', 1), row('E', 1)];
+    const p2 = [row('E', 1), row('A', 1)];
+    const result = compareMany(
+      [
+        { id: 'x', rows: x },
+        { id: 'p1', rows: p1 },
+        { id: 'p2', rows: p2 },
+      ],
+      { getMatchKey, compareFields, mode: 'all' },
+    );
+    const aligned = alignComparisonRowsMany(result);
+    // 位置: A / B(p2 はプレースホルダ)/ E(x はプレースホルダ)。
+    expect(aligned.rowCount).toBe(3);
+    expect(aligned.rows.get('x')![0]).toBe(x[0]);
+    expect(aligned.rows.get('p1')![0]).toBe(p1[1]);
+    expect(aligned.rows.get('p2')![0]).toBe(p2[1]);
+    expect(aligned.rows.get('p1')![1]).toBe(p1[0]);
+    expect(aligned.placeholders.get('p2')!.has(aligned.rows.get('p2')![1])).toBe(true);
+    expect(aligned.rows.get('p1')![2]).toBe(p1[2]);
+    expect(aligned.rows.get('p2')![2]).toBe(p2[0]);
+    expect(aligned.placeholders.get('x')!.has(aligned.rows.get('x')![2])).toBe(true);
+  });
+});

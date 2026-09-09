@@ -248,6 +248,7 @@ describe('compareMany: ラベルのカスタマイズ', () => {
 
   it('formatDefaultMultiDiffLabel は単体でも呼べる', () => {
     const ctx: MultiDiffLabelContext<Row> = {
+      mode: 'base',
       sideId: 'a',
       isBase: false,
       kind: 'only',
@@ -260,5 +261,147 @@ describe('compareMany: ラベルのカスタマイズ', () => {
       labels: DEFAULT_COMPARISON_MULTI_LABELS,
     };
     expect(formatDefaultMultiDiffLabel(ctx)).toBe('この構成のみ');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// mode 'all'(全構成一致判定)。
+// ---------------------------------------------------------------------------------------------
+describe("compareMany: mode 'all'", () => {
+  // X: A(全一致) / B(案2 と数量違い) / C(案2 に無い) / D(X のみ)。
+  // 案1: A / B(X と同じ) / C / E(案1・案2 にある)。案2: A / B' / E。
+  const x = [row('A', 1), row('B', 2), row('C', 1), row('D', 1)];
+  const p1 = [row('A', 1), row('B', 2), row('C', 1), row('E', 1)];
+  const p2 = [row('A', 1), row('B', 3), row('E', 1)];
+  const allSides = [
+    { id: 'x', rows: x, label: 'X' },
+    { id: 'p1', rows: p1, label: '案1' },
+    { id: 'p2', rows: p2, label: '案2' },
+  ];
+  const result = compareMany(allSides, { ...options, mode: 'all' });
+  const diffOf = (id: string, r: Row) => result.sidesById.get(id)!.diffs.get(r)!;
+
+  it('基準は無く(baseId undefined / isBase 全 false)、軸は先頭の構成、pairs は空', () => {
+    expect(result.mode).toBe('all');
+    expect(result.baseId).toBeUndefined();
+    expect(result.axisId).toBe('x');
+    expect(result.sides.map((s) => s.isBase)).toEqual([false, false, false]);
+    expect(result.pairs.size).toBe(0);
+  });
+
+  it('全構成に存在し全構成で一致する行だけが same', () => {
+    expect(diffOf('x', x[0]).kind).toBe('same');
+    expect(diffOf('p1', p1[0]).kind).toBe('same');
+    expect(diffOf('p2', p2[0]).kind).toBe('same');
+    expect(diffOf('x', x[0]).counterparts.get('p1')).toBe(p1[0]);
+    expect(diffOf('x', x[0]).counterparts.get('p2')).toBe(p2[0]);
+  });
+
+  it('1 構成でも違えば全ペインで field-diff になり、内訳は自分から見た相手ごと(2-way の (A) では案1 は same だった)', () => {
+    // X から見て: 案1 は同じ、案2 が数量違い。
+    expect(diffOf('x', x[1]).kind).toBe('field-diff');
+    expect(diffOf('x', x[1]).label).toBe('案2: 数量違い');
+    // 案1 から見て: X は同じ、案2 が数量違い → (A) の基準 X なら same だった行。
+    expect(diffOf('p1', p1[1]).kind).toBe('field-diff');
+    expect(diffOf('p1', p1[1]).label).toBe('案2: 数量違い');
+    expect(diffOf('p1', p1[1]).bySide.get('x')?.kind).toBe('same');
+    expect(diffOf('p1', p1[1]).bySide.get('p2')?.kind).toBe('field-diff');
+    // 案2 から見て: X も 案1 も数量違い。
+    expect(diffOf('p2', p2[1]).label).toBe('X: 数量違い / 案1: 数量違い');
+    expect([...diffOf('p2', p2[1]).fieldDiffs]).toEqual(['qty']);
+  });
+
+  it('一部の構成に無い行はどのペインでも partial になり、missingIn にその構成が入る', () => {
+    expect(diffOf('x', x[2])).toMatchObject({ kind: 'partial', label: '案2: 無し' });
+    expect([...diffOf('x', x[2]).missingIn]).toEqual(['p2']);
+    expect(diffOf('p1', p1[2])).toMatchObject({ kind: 'partial', label: '案2: 無し' });
+    expect(diffOf('p1', p1[2]).bySide.get('p2')?.kind).toBe('left-only');
+    // E は X に無い → 案1 / 案2 のペインで partial。
+    expect(diffOf('p1', p1[3])).toMatchObject({ kind: 'partial', label: 'X: 無し' });
+    expect(diffOf('p2', p2[2])).toMatchObject({ kind: 'partial', label: 'X: 無し' });
+  });
+
+  it('他のどの構成にも無い行は only(この構成のみ)', () => {
+    expect(diffOf('x', x[3])).toMatchObject({ kind: 'only', label: 'この構成のみ' });
+    expect([...diffOf('x', x[3]).missingIn]).toEqual(['p1', 'p2']);
+  });
+
+  it('summary は構成ごとに partial を含む', () => {
+    expect(result.sidesById.get('x')!.summary).toEqual({ total: 4, same: 1, only: 1, partial: 1, fieldDiff: 1 });
+    expect(result.sidesById.get('p1')!.summary).toEqual({ total: 4, same: 1, only: 0, partial: 2, fieldDiff: 1 });
+    expect(result.hasAnyDiff).toBe(true);
+  });
+
+  it('equals は (自分の値, 相手の値) の順で呼ばれる', () => {
+    const seen: [unknown, unknown][] = [];
+    const r = compareMany(
+      [
+        { id: 'x', rows: [row('A', 1)] },
+        { id: 'y', rows: [row('A', 2)] },
+      ],
+      {
+        getMatchKey: (row) => row.id,
+        compareFields: [
+          {
+            key: 'qty',
+            label: '数量',
+            equals: (self, other) => {
+              seen.push([self, other]);
+              return self === other;
+            },
+          },
+        ],
+        mode: 'all',
+      },
+    );
+    expect(seen).toEqual([
+      [1, 2], // x の行から見て
+      [2, 1], // y の行から見て
+    ]);
+    expect(r.sidesById.get('x')!.diffs.get(r.sidesById.get('x')!.rows[0])!.kind).toBe('field-diff');
+  });
+
+  it('2 構成では接頭辞なしで 2-way と同じ見た目になり、baseId は無視される', () => {
+    const r = compareMany(
+      [
+        { id: 'x', rows: [row('A', 1), row('B', 1)], label: 'X' },
+        { id: 'y', rows: [row('A', 2)], label: 'Y' },
+      ],
+      { ...options, mode: 'all', baseId: 'y' },
+    );
+    expect(r.baseId).toBeUndefined();
+    expect(r.axisId).toBe('x');
+    const xs = r.sidesById.get('x')!;
+    expect(xs.diffs.get(xs.rows[0])!.label).toBe('数量違い');
+    expect(xs.diffs.get(xs.rows[1])!.label).toBe('この構成のみ');
+    const ys = r.sidesById.get('y')!;
+    expect(ys.diffs.get(ys.rows[0])!.label).toBe('数量違い');
+  });
+
+  it('重複キーは構成ごとに報告され、duplicateKeyPolicy に従う', () => {
+    const r = compareMany(
+      [
+        { id: 'x', rows: [row('A', 1), row('A', 2)] },
+        { id: 'y', rows: [row('A', 2)] },
+      ],
+      { ...options, mode: 'all' },
+    );
+    expect(r.sidesById.get('x')!.duplicateKeys).toEqual(['A']);
+    // y の A は x の後勝ち(qty 2)と一致 → same。
+    expect(r.sidesById.get('y')!.diffs.get(r.sidesById.get('y')!.rows[0])!.kind).toBe('same');
+    const first = compareMany(
+      [
+        { id: 'x', rows: [row('A', 1), row('A', 2)] },
+        { id: 'y', rows: [row('A', 2)] },
+      ],
+      { ...options, mode: 'all', duplicateKeyPolicy: 'first' },
+    );
+    expect(first.sidesById.get('y')!.diffs.get(first.sidesById.get('y')!.rows[0])!.kind).toBe('field-diff');
+  });
+
+  it('formatDiffLabel の ctx に mode が渡る', () => {
+    const modes = new Set<string>();
+    compareMany(allSides, { ...options, mode: 'all', formatDiffLabel: (ctx) => { modes.add(ctx.mode); return ''; } });
+    expect([...modes]).toEqual(['all']);
   });
 });

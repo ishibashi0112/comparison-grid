@@ -83,6 +83,7 @@ export type {
   AlignComparisonRowsOptions,
   AlignComparisonRowsResult,
   ComparisonSideId,
+  ComparisonMultiMode,
   ComparisonSideInput,
   ComparisonSideInfo,
   ComparisonMultiDiffKind,

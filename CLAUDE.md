@@ -44,7 +44,7 @@ src/components/comparison-grid/
   model/types.ts        公開型(API_REFERENCE.md と対応)
   logic/compare.ts      純ロジック: 突き合わせ + 差分判定 + ラベル生成(React 非依存)
   logic/alignRows.ts    純ロジック: 左右整列(プレースホルダ行の挿入)
-  logic/compareMany.ts  純ロジック: N 構成比較(基準対各構成。2-way の compare() を構成ごとに呼んで集約)
+  logic/compareMany.ts  純ロジック: N 構成比較(mode 'base' = 基準対各構成。2-way の compare() を構成ごとに呼んで集約 / mode 'all' = 全構成一致判定)
   logic/alignRowsMany.ts 純ロジック: N 構成の整列(構成ごとの配列 + プレースホルダ)
   logic/paneColumns.ts  純ロジック: 列定義 / 行クラスの合成、差分ラベル列(2-way / N 構成どちらの差分も受ける)
   logic/exportData.ts   純ロジック: エクスポートデータ生成(getExportData() と同形)
