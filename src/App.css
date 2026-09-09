@@ -234,3 +234,62 @@
   font-weight: 600;
   vertical-align: middle;
 }
+
+/* 使用例モード: 例のコンポーネントはスタイルを持たないので、最低限の余白と表の見た目だけ与える。 */
+.demo-example {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--demo-surface);
+  border: 1px solid var(--demo-border);
+}
+
+.demo-example section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.demo-example section > .cmpg-view,
+.demo-example section > .example-csv {
+  align-self: stretch;
+}
+
+.demo-example label,
+.demo-example button {
+  margin-right: 8px;
+}
+
+.demo-example .example-own-layout {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.demo-example .example-own-layout th {
+  text-align: left;
+  padding: 4px 0;
+}
+
+.demo-example .example-own-layout td {
+  width: 50%;
+  vertical-align: top;
+  padding: 0 4px;
+}
+
+.demo-example .example-csv {
+  max-height: 200px;
+  overflow: auto;
+  padding: 8px;
+  background: var(--demo-bg);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.demo-example .example-diff-counts {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-left: 20px;
+}

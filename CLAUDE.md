@@ -68,7 +68,7 @@ src/components/comparison-grid/
   view/ComparisonView.tsx 2 ペインレイアウト(合成コンポーネントで組んだプリセット。props / DOM は従来どおり)
   styles.css            .cmpg-* クラス + --cmpg-* トークン(未レイヤー / :where)
   index.ts              公開バレル
-src/App.tsx / src/demo/  ss2602(部品構成比較)再現デモ。App.tsx はモード切替(2 構成 = 木モード / N 構成 = demo/MultiComparisonDemo.tsx の合成コンポーネント + 平坦比較)
+src/App.tsx / src/demo/  ss2602(部品構成比較)再現デモ。App.tsx はモード切替(2 構成 = 木モード / N 構成 = demo/MultiComparisonDemo.tsx の合成コンポーネント + 平坦比較 / 使用例 = demo/ExamplesDemo.tsx が examples/ をそのまま描画)
 skills/comparison-grid/SKILL.md 利用側プロジェクト向けの Claude Code スキル(用途 → API / 最小コード / 落とし穴)。npm 配布物に同梱
 scripts/emit-llms.mjs   llms.txt / llms-full.txt(README + API_REFERENCE + examples/README + SKILL の結合)を生成。build:lib の最終ステップ。手で編集しない
 examples/               使用例(01〜08 + data.ts + README)。利用側と同じ `@ishibashi0112/comparison-grid` で import する(tsconfig.app.json の paths / vite・vitest の alias でソースへ解決)。examples.test.tsx で描画テスト。npm 配布物に同梱(package.json files)

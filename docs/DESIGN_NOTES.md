@@ -191,7 +191,7 @@
 - **目的**: 人と AI がライブラリを把握するための「腐らないドキュメント」。例は利用側と同じ import パス(`@ishibashi0112/comparison-grid`)で書き、`tsconfig.app.json` の `paths` と vite / vitest の `resolve.alias` でソースへ解決する。型検査(`tsc -b` / `typecheck:test`)と描画テスト(`examples/examples.test.tsx`。`installJsdomLayoutStubs` で実グリッドを描画)の対象なので、公開 API を変えれば落ちる。
 - 8 本: 01 2-way 基本 / 02 階層比較 / 03 基準対 3 構成 + `ComparisonLayout` / 04 `mode: 'all'` + `useComparisonLayout` の自作パーツ / 05 2×2 配置 + 同期グループを差分ジャンプと共有 / 06 完全ヘッドレス(自前 DOM の `SpreadsheetGrid`)/ 07 CSV エクスポート / 08 マニュアル入力(`useManualRows`)。共通データは `data.ts`。
 - npm 配布物に同梱(`files: ["dist", "examples"]`)。AI 向けの SKILL / llms.txt からもここを参照する予定。
-- 見送り: デモ画面への「使用例」タブ(必要になったら `src/App.tsx` にモードを足すだけ)。
+- デモ画面の「使用例」モード(`demo/ExamplesDemo.tsx`)は batch 29(2026-09-09)で追加。例のコンポーネントをそのまま import して描画するだけで、デモ側は選択 UI しか持たない(例のコードが動く一次情報のまま)。
 
 ### 実装済み(2026-09-09・batch 26。API_REFERENCE の「用途 → API」索引 + 公開フックの JSDoc `@example`)
 

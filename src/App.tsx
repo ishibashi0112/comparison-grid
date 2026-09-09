@@ -2,7 +2,7 @@
 //   利用側が書くのは「行の型 / データ / 列定義 / 比較設定」だけで、差分計算・ラベル生成・
 //   行 / セルのハイライト・差分のみフィルタはライブラリ側が担います(引き継ぎ書のゴール像)。
 //   モード切替: 「2 構成(階層)」= 従来の木モード(ComparisonView)/ 「N 構成(平坦)」= 基準 + 案 1・案 2…
-//   を合成コンポーネントで並べる(demo/MultiComparisonDemo.tsx)。
+//   を合成コンポーネントで並べる(demo/MultiComparisonDemo.tsx)/ 「使用例」= examples/ をそのまま描画(demo/ExamplesDemo.tsx)。
 import { useCallback, useMemo, useState, type FormEvent } from 'react';
 import type { GridColumn, GridTheme } from '@ishibashi0112/spreadsheet-grid';
 import {
@@ -23,9 +23,16 @@ import {
   type RootItemInfo,
 } from './demo/bomData';
 import { MultiComparisonDemo } from './demo/MultiComparisonDemo';
+import { ExamplesDemo } from './demo/ExamplesDemo';
 import './App.css';
 
-type DemoMode = 'tree' | 'multi';
+type DemoMode = 'tree' | 'multi' | 'examples';
+
+// URL の ?mode=tree|multi|examples で初期モードを指定できる(共有リンク / スクリーンショット用)。
+const readInitialMode = (): DemoMode => {
+  const mode = new URLSearchParams(window.location.search).get('mode');
+  return mode === 'multi' || mode === 'examples' ? mode : 'tree';
+};
 
 // 1. 比較設定: 「差分を見る」フィールドを宣言するだけ。
 const COMPARE_FIELDS: CompareField<BomRow>[] = [
@@ -140,7 +147,7 @@ function PaneHeader({ info }: { info: RootItemInfo }) {
 }
 
 export default function App() {
-  const [mode, setMode] = useState<DemoMode>('tree');
+  const [mode, setMode] = useState<DemoMode>(readInitialMode);
   const [theme, setTheme] = useState<GridTheme>('light');
   const [cvdColors, setCvdColors] = useState(false);
 
@@ -160,6 +167,13 @@ export default function App() {
         onClick={() => setMode('multi')}
       >
         N 構成(平坦・合成コンポーネント)
+      </button>
+      <button
+        type="button"
+        className={mode === 'examples' ? 'demo-button demo-button--primary' : 'demo-button'}
+        onClick={() => setMode('examples')}
+      >
+        使用例(examples/)
       </button>
       <label className="demo-toggle">
         テーマ
@@ -185,8 +199,10 @@ export default function App() {
       {modeBar}
       {mode === 'tree' ? (
         <TreeComparisonDemo theme={theme} cvdColors={cvdColors} />
-      ) : (
+      ) : mode === 'multi' ? (
         <MultiComparisonDemo theme={theme} cvdColors={cvdColors} />
+      ) : (
+        <ExamplesDemo />
       )}
     </div>
   );
