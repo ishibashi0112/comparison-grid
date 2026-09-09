@@ -57,6 +57,22 @@ const collectKeptRows = <T>(
   return { rows, context };
 };
 
+/**
+ * 階層(部品表の木)の比較。木からパスキー(`B2002/C3001`)を導出して突き合わせ、整列は構造マージ、
+ * 「差分のみ」では差分行の祖先を文脈行として残します。戻り値は `ComparisonView` にそのまま渡せます。
+ *
+ * @example
+ * ```tsx
+ * const leftTree = useMemo(() => buildComparisonTree(leftRows, { getLevel: (r) => r.level }), [leftRows]);
+ * const rightTree = useMemo(() => buildComparisonTree(rightRows, { getLevel: (r) => r.level }), [rightRows]);
+ * const comparison = useTreeComparison<Row>({
+ *   left: leftTree.roots, right: rightTree.roots,
+ *   getCode: (row) => row.itemCode,
+ *   compareFields, showDiffOnly, alignRows, collapsedKeys,
+ * });
+ * comparison.getTreeInfo(row)?.depth; // Level 列のインデントに
+ * ```
+ */
 export function useTreeComparison<T>(
   options: UseTreeComparisonOptions<T>,
 ): UseTreeComparisonResult<T> {

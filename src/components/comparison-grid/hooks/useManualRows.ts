@@ -11,6 +11,18 @@ import type {
   UseManualRowsResult,
 } from '../model/types';
 
+/**
+ * マニュアル入力ペインの行 state(末尾空行の維持 / 正規化 / 送信時検証)。空行を除いた `dataRows` を
+ * `useComparison` の片側に渡し、`gridProps` を編集側のペインにスプレッドします。
+ *
+ * @example
+ * ```tsx
+ * const manual = useManualRows<Row>({ createRow, isEmptyRow, normalizeRow, validateRow });
+ * const comparison = useComparison<Row>({ left: master, right: manual.dataRows, getMatchKey, compareFields });
+ * <ComparisonView<Row> comparison={comparison} columns={editableColumns}
+ *   gridProps={{ readOnly: true }} rightGridProps={{ ...manual.gridProps, readOnly: false }} />;
+ * ```
+ */
 export function useManualRows<T>(options: UseManualRowsOptions<T>): UseManualRowsResult<T> {
   const { createRow, isEmptyRow, normalizeRow, validateRow, trailingEmptyRows = 1 } = options;
 

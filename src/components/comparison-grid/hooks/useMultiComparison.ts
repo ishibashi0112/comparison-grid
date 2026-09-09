@@ -33,6 +33,32 @@ const sidesEqual = <T>(
   return true;
 };
 
+/**
+ * 3 構成以上の比較(`compareMany()` の React 接続)。`mode: 'base'`(既定)は基準対各構成、`mode: 'all'` は
+ * 全構成一致判定。戻り値は `ComparisonLayout.Root` の `comparison` にそのまま渡せます。
+ *
+ * @example
+ * ```tsx
+ * const multi = useMultiComparison<Row>({
+ *   sides: [
+ *     { id: 'current', rows: current, label: '現行' },
+ *     { id: 'planA', rows: planA, label: '案1' },
+ *     { id: 'planB', rows: planB, label: '案2' },
+ *   ],
+ *   getMatchKey: (row) => row.id,
+ *   compareFields,
+ *   alignRows: true,
+ * });
+ * <ComparisonLayout.Root<Row> comparison={multi} columns={columns} keyColumnKeys={['id']}>
+ *   {multi.sides.map((side) => (
+ *     <ComparisonLayout.Pane key={side.id} side={side.id}>
+ *       <ComparisonLayout.Header>{side.label}</ComparisonLayout.Header>
+ *       <ComparisonLayout.Grid<Row> />
+ *     </ComparisonLayout.Pane>
+ *   ))}
+ * </ComparisonLayout.Root>;
+ * ```
+ */
 export function useMultiComparison<T>(
   options: UseMultiComparisonOptions<T>,
 ): UseMultiComparisonResult<T> {

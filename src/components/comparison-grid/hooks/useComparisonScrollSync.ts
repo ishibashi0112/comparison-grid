@@ -150,7 +150,17 @@ export function useComparisonScrollSyncMany<T>(
   return useMemo(() => ({ sides: composed, group }), [composed, group]);
 }
 
-/** 2-way の便利版。enabled=false では入力をそのまま返します(ref / onScroll を足さない)。 */
+/**
+ * 2 構成のスクロール同期(便利版)。両側の `ref` / `onScroll` を合成した grid props を返します。
+ * `enabled=false` では入力をそのまま返します(ref / onScroll を足さない)。
+ *
+ * @example
+ * ```tsx
+ * const sync = useComparisonScrollSync<Row>({ syncHorizontal: false });
+ * const left = useComparisonPane<Row>({ …, gridProps: sync.leftGridProps });
+ * const right = useComparisonPane<Row>({ …, gridProps: sync.rightGridProps });
+ * ```
+ */
 export function useComparisonScrollSync<T>(
   options: UseComparisonScrollSyncOptions<T> = {},
 ): UseComparisonScrollSyncResult<T> {

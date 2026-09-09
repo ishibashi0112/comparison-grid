@@ -14,6 +14,18 @@ import type {
   UseComparisonNavigationResult,
 } from '../model/types';
 
+/**
+ * 2 構成の差分ジャンプ(次 / 前の差分行へ両ペインをスクロール)。ハンドル ref はフックが生成するので、
+ * `leftGridProps={{ ref: navigation.leftRef }}` のように配線します。
+ *
+ * @example
+ * ```tsx
+ * const navigation = useComparisonNavigation<Row>({ comparison, alignRows });
+ * <button onClick={navigation.goToNextDiff} disabled={!navigation.canNavigate}>次の差分</button>
+ * <ComparisonView<Row> comparison={comparison} columns={columns}
+ *   leftGridProps={{ ref: navigation.leftRef }} rightGridProps={{ ref: navigation.rightRef }} />;
+ * ```
+ */
 export function useComparisonNavigation<T>(
   options: UseComparisonNavigationOptions<T>,
 ): UseComparisonNavigationResult<T> {

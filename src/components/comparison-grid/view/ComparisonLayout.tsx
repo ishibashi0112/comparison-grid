@@ -36,6 +36,22 @@ import '../styles.css';
 
 const CLASS_SAFE_ID = /^[A-Za-z0-9_-]+$/;
 
+/**
+ * 合成コンポーネントの Root。比較結果(2-way / N 構成)・列・ハイライト設定・スクロール同期グループを Context で
+ * 配ります。子に置いた `ComparisonLayout.Pane` の数だけペインが並びます(横並びは等幅カラム)。
+ *
+ * @example
+ * ```tsx
+ * <ComparisonLayout.Root<Row> comparison={multi} columns={columns} keyColumnKeys={['id']} enableScrollSync>
+ *   {multi.sides.map((side) => (
+ *     <ComparisonLayout.Pane key={side.id} side={side.id}>
+ *       <ComparisonLayout.Header>{side.label}</ComparisonLayout.Header>
+ *       <ComparisonLayout.Grid<Row> gridProps={{ height: 480 }} />
+ *     </ComparisonLayout.Pane>
+ *   ))}
+ * </ComparisonLayout.Root>
+ * ```
+ */
 export function ComparisonLayoutRoot<T extends object>(props: ComparisonLayoutRootProps<T>) {
   const {
     comparison,
@@ -129,6 +145,7 @@ export function ComparisonLayoutRoot<T extends object>(props: ComparisonLayoutRo
   );
 }
 
+/** 1 ペインのラッパー(`.cmpg-pane`)。`side` に構成 ID(2-way では 'left' / 'right')を指定し、配下の Grid に供給します。 */
 export function ComparisonLayoutPane(props: ComparisonLayoutPaneProps) {
   const { side, className, style, children } = props;
   useComparisonLayout();
@@ -149,6 +166,7 @@ export function ComparisonLayoutPane(props: ComparisonLayoutPaneProps) {
   );
 }
 
+/** ペインのヘッダースロット(`.cmpg-pane-header`)。置いたペインにだけ描画されます。 */
 export function ComparisonLayoutHeader(props: ComparisonLayoutHeaderProps) {
   const { className, style, children } = props;
   return (
@@ -158,6 +176,7 @@ export function ComparisonLayoutHeader(props: ComparisonLayoutHeaderProps) {
   );
 }
 
+/** ペインのグリッド(`.cmpg-pane-body` + `SpreadsheetGrid`)。Pane 配下では `side` 省略可。本体は `useComparisonPane` + `useSyncedGridProps`。 */
 export function ComparisonLayoutGrid<T extends object>(props: ComparisonLayoutGridProps<T>) {
   const { side: sideProp, gridProps, className, style } = props;
   const layout = useComparisonLayout<T>();

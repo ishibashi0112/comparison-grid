@@ -193,6 +193,11 @@
 - npm 配布物に同梱(`files: ["dist", "examples"]`)。AI 向けの SKILL / llms.txt からもここを参照する予定。
 - 見送り: デモ画面への「使用例」タブ(必要になったら `src/App.tsx` にモードを足すだけ)。
 
+### 実装済み(2026-09-09・batch 26。API_REFERENCE の「用途 → API」索引 + 公開フックの JSDoc `@example`)
+
+- API_REFERENCE の先頭に「やりたいこと → 使う API → 使用例」の表、層の図(プリセット → 合成コンポーネント → ヘッドレス → 純ロジック)、落とし穴 5 点を置いた。約 700 行のリファレンスを上から読まなくても入口が分かるようにするため(人にも AI にも)。
+- 公開フック 8 本と `ComparisonView` / `ComparisonLayoutRoot` に JSDoc(`@example` つき)。`tsc -p tsconfig.lib.json` の宣言出力に写るので、`.d.ts` 経由でエディタ上の補完 / AI にも届く。
+
 ## 6. 検討中(2026-09-09。batch 19〜25 で 6-3 の 1〜5 + (B) + 使用例を実装済み — 残りは 6 の木モード N 化と AI 向けドキュメント)
 
 ### 6-1. N 構成比較(3・4 構成へ拡張)

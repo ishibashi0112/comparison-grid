@@ -20,6 +20,21 @@ import { useStableArray, useStableObject } from './useStableValue';
 import { cx } from '../logic/cx';
 import '../styles.css';
 
+/**
+ * 片側 1 ペインぶんの差分合成(ヘッドレス)。DOM を持たず、`SpreadsheetGrid` へそのままスプレッドできる
+ * `gridProps`(合成済みの列 / 行クラス / `cmpg-grid` クラス)を返します。`diffs` は 2-way でも N 構成でも可。
+ *
+ * @example
+ * ```tsx
+ * const pane = useComparisonPane<Row>({
+ *   rows: comparison.visibleLeft, diffs: comparison.leftDiffs, columns,
+ *   compareFields: comparison.compareFields, keyColumnKeys: ['id'],
+ *   placeholderRows: comparison.placeholders.left,
+ *   gridProps: { height: 400 },
+ * });
+ * <SpreadsheetGrid<Row> {...pane.gridProps} />;
+ * ```
+ */
 export function useComparisonPane<T extends object>(
   options: UseComparisonPaneOptions<T>,
 ): UseComparisonPaneResult<T> {

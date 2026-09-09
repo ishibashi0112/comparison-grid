@@ -12,6 +12,24 @@ import {
   ComparisonLayoutRoot,
 } from './ComparisonLayout';
 
+/**
+ * 2 ペインのプリセット(`ComparisonLayout` で組んだもの)。`useComparison` / `useTreeComparison` の戻り値と
+ * 列定義を渡すだけで、差分ハイライト / 差分ラベル列 / スクロール同期つきの左右比較になります。
+ *
+ * @example
+ * ```tsx
+ * <ComparisonView<Row>
+ *   comparison={comparison}
+ *   columns={columns}
+ *   keyColumnKeys={['id']}
+ *   showDiffLabelColumn
+ *   enableScrollSync
+ *   leftHeader={<strong>現行</strong>}
+ *   rightHeader={<strong>案1</strong>}
+ *   gridProps={{ height: 480 }}
+ * />
+ * ```
+ */
 export function ComparisonView<T extends object>(props: ComparisonViewProps<T>) {
   const {
     comparison,

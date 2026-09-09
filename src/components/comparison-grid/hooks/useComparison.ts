@@ -20,6 +20,21 @@ import { useStableArray, useStableObject } from './useStableValue';
 const EMPTY_SET: ReadonlySet<never> = new Set();
 const EMPTY_PLACEHOLDERS: ComparisonPlaceholders<never> = { left: EMPTY_SET, right: EMPTY_SET };
 
+/**
+ * 2 つのリストをキーで突き合わせ、差分と表示行(差分のみ / 整列)を導出します(`compare()` の React 接続)。
+ * 戻り値はそのまま `ComparisonView` の `comparison` に渡せます。
+ *
+ * @example
+ * ```tsx
+ * const comparison = useComparison<Row>({
+ *   left, right,
+ *   getMatchKey: (row) => row.id,
+ *   compareFields: [{ key: 'qty', label: '数量' }],
+ *   showDiffOnly, // 実効値は comparison.effectiveShowDiffOnly(片側が空なら false)
+ * });
+ * <ComparisonView<Row> comparison={comparison} columns={columns} keyColumnKeys={['id']} />;
+ * ```
+ */
 export function useComparison<T>(options: UseComparisonOptions<T>): UseComparisonResult<T> {
   const {
     left,

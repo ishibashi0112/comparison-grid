@@ -6,6 +6,40 @@
 
 最終更新: 2026-09-09(batch 24: N 構成比較の全構成一致判定 `mode: 'all'`。batch 19〜22 で N 構成の純ロジック / `useMultiComparison` / 同期と差分ジャンプの N 対応 / 合成コンポーネント `ComparisonLayout`)。
 
+## どれを使うか(用途 → API)
+
+| やりたいこと | 使う API | 使用例 |
+| --- | --- | --- |
+| 2 つのリストを比べて画面に出す | `useComparison` + `ComparisonView` | [examples/01](../../../examples/01-two-way-basic.tsx) |
+| 部品表(階層)を比べる。別の親の下の同じ品番を突き合わせない | `buildComparisonTree` + `useTreeComparison` + `ComparisonView` | [examples/02](../../../examples/02-tree-comparison.tsx) |
+| 3 構成以上を「基準に対して」比べる | `useMultiComparison` + `ComparisonLayout.Root / .Pane / .Header / .Grid` | [examples/03](../../../examples/03-multi-base.tsx) |
+| 3 構成以上で「どこかに揺れがある行」を全部出す | `useMultiComparison({ mode: 'all' })` | [examples/04](../../../examples/04-multi-all.tsx) |
+| ペインの配置・数・見出しを自分で決める(2×2 など) | `ComparisonLayout`(Root の `style` / `.cmpg-view` の CSS 上書き) | [examples/05](../../../examples/05-grid-2x2-navigation.tsx) |
+| 次 / 前の差分へスクロール | `useComparisonNavigation`(2 構成)/ `useMultiComparisonNavigation`(N 構成。`useComparisonScrollSyncGroup` の `getHandle` と共有可) | [examples/05](../../../examples/05-grid-2x2-navigation.tsx) |
+| DOM を完全に自前にする(ライブラリからは grid props だけ受け取る) | `useComparisonPane` + `useComparisonScrollSync`(2 構成)/ `useComparisonScrollSyncMany`(N 構成) | [examples/06](../../../examples/06-headless-own-grid.tsx) |
+| React なしで判定だけ使う(Node / Worker / テスト) | `compare` / `alignComparisonRows` / `compareMany` / `alignComparisonRowsMany` / `buildComparisonTree` / `flattenComparisonTree` | — |
+| CSV / Excel に出す | `getComparisonExportData`(grid の `getExportData()` と同形) | [examples/07](../../../examples/07-export-csv.tsx) |
+| ユーザーが手入力したリストをマスタと比べる | `useManualRows` + `useComparison` | [examples/08](../../../examples/08-manual-input.tsx) |
+| 色・余白・クラスを変える | `--cmpg-*` トークン / `CMPG_CLASS_NAMES` / `.cmpg-colors-cvd` / `style.layer.css` | [README「Styles」](../../../README.md#styles) |
+| Root 配下に自作のツールバー / 集計を置く | `useComparisonLayout()` / `useComparisonLayoutSide()` | [examples/04](../../../examples/04-multi-all.tsx) |
+
+**層の構造**(下ほど自由度が高く、上ほど書く量が少ない):
+
+```
+ComparisonView(2 ペインのプリセット)
+  └ ComparisonLayout.Root / .Pane / .Header / .Grid(合成コンポーネント。配置と数は JSX で決める)
+      └ useComparisonPane / useSyncedGridProps / useComparisonScrollSyncGroup(ヘッドレス。grid props を返す)
+          └ compare / compareMany / alignComparisonRows(Many) / buildComparisonTree(純ロジック。React 非依存)
+```
+
+**落とし穴(先に読む)**:
+
+- 差分は行**オブジェクトの同一性**で引く。`visibleLeft` 等を `map` で複製してからペインに渡すと強調されない。
+- `createPlaceholderRow` / `getMatchKey` / `getCode` などの関数は**コンポーネント外で定義**する(インラインだと毎レンダー再計算)。`compareFields` / `columns` / `labels` / `sides` は浅い比較で安定化されるのでインラインでよい。
+- `useComparison` の `showDiffOnly` は「意思」。表示に使うのは `effectiveShowDiffOnly`、トグルの `disabled` は `!canShowDiffOnly`。
+- `scrollToRow` は view index を使うので、グリッド側のソート / フィルター適用中は差分ジャンプの行位置がずれる。
+- 木モードは「展開済み・出現 1 回 = 1 行」のデータ前提。破綻は `buildComparisonTree(...).issues` で検出されるが修復はされない。
+
 ## 設計の要点
 
 - **サイドカー方式**: 行 `T` には書き込まず、差分は `ReadonlyMap<T, ComparisonRowDiff<T>>` で行オブジェクトに紐づけます。グリッドへ渡すのは `T[]` そのものなので、`GridColumn<T>` / `SpreadsheetGridProps<T>` を `T` の型のまま書けます。
