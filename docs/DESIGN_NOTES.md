@@ -291,3 +291,30 @@ HeroUI の `Dropdown.Trigger / .Popover / .Menu / .Item` の形は **Compound Co
 6. 木モードの N 化(必要になったら)。
 
 **決定済み(2026-09-07)**: 意味論は (A)。(B) は将来実装(捨てない)→ **2026-09-09 batch 24 で `mode: 'all'` として実装済み**。合成版 `ComparisonPane` の名前は推奨案。木モードの N 化は後回し。
+
+## 7. 利用側(ss2602)への導入で得た知見(2026-09-10)
+
+ss2602(部品構成比較。HeroUI v3 + Tailwind v4 + Vite 7)へ本ライブラリ 0.6.0 を導入した(`ishibashi0112/test_rep` の `ss2602/`)。
+通常モードは `buildComparisonTree` + `useTreeComparison`、マニュアルモードは `useComparison` + `useManualRows`、
+表示は `ComparisonView`、差分ジャンプは `useComparisonNavigation`。既存コード(spreadsheet-grid 0.16)は 0.32.0 へ上げても
+無変更で tsc / eslint / build が通った。
+
+- **単一モジュール配布と lazy 分割。** `dist/index.js` は 1 ファイルで、先頭で `SpreadsheetGrid` を import する。利用側が
+  「比較フックは初期バンドル、`ComparisonView` は lazy チャンク」と分けると、Rollup はモジュール単位で配置するため
+  本ライブラリ丸ごと(+ 参照される spreadsheet-grid)が初期バンドルへ入り、分割が効かない(ss2602 では app.js 555 KB →
+  842 KB、lazy チャンク 3.7 KB)。`sideEffects` は両パッケージとも CSS のみで、`treeshake.moduleSideEffects` を
+  いじっても解消しない(使われている import なので当然)。利用側の対処は「フックとビューを同じチャンクに置く」
+  (ss2602 は画面全体を lazy の単位にした。app.js 362 KB / 画面チャンク 482 KB)。
+  ライブラリ側の候補: `vite.lib.config.ts` の `rollupOptions.output.preserveModules: true` でファイル単位に分割し、
+  フックだけの import で spreadsheet-grid を引き込まないようにする(`exports` はそのまま。d.ts は既にファイル単位)。
+  必要になったら実施(現状の利用側は 1 画面なので急がない)。SKILL / API_REFERENCE の落とし穴に記載。
+- **ピン留め列があると `.ssg-body-row` が行ごとに複数描画される。** 行要素はセクション(本体 / 左右ピン留め)ごとに
+  出るため、jsdom テストで「行数 = `.ssg-body-row` の数」とすると倍になる。`data-row-index` の一意な数で数える
+  (本リポジトリのテストはピン留め列を使っていないので気付かなかった)。SKILL の落とし穴に記載。
+- **`title: ''` の列見出しは `key` にフォールバックする**(4 章の提案 7 のとおり。0.32.0 でも同じ)。ss2602 の
+  品目マスタ列は `title: 'マスタ'` にした。
+- **ラベル文言の互換。** 既定ラベル(左のみ / 右のみ / 数量・支給区分違い)は ss2602 の旧実装と同一だった
+  (`compareFields` の宣言順が「数量 → 支給区分」であること)。Excel の差分種別列は `annotatedLeft/Right` の
+  `diff.label` から作り、`getComparisonExportData` は使わなかった(Excel の列構成がグリッド列と異なるため)。
+- **旧実装との挙動差(利用側 README に記載)**: 代表品番比較は親の置換が子孫へ伝播する(旧: 自品番だけ置換)。
+  差分のみ表示は祖先が文脈行として残る(旧: 差分行だけ)。

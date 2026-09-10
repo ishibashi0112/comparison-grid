@@ -707,6 +707,7 @@ const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows 
 - グリッドの行グルーピング(`rowGroup`)を有効にした場合、グループ行には差分クラスは付きません(leaf 行のみ)。
 - 木モード(`useTreeComparison`)の `visibleLeft` / `visibleRight` は平坦化した配列で、入力と同一参照にはなりません(木の参照が同じなら安定)。渡す木は `useMemo` で組み立ててください。
 - 木モードは「展開済みの、出現 1 回 = 1 行」のデータを前提にします。行が深さ優先順に並んでいない・親参照に品番を使っている等の破綻は `buildComparisonTree(...).issues` で**検出**できますが**修復**はされません。品目間の構成マスタ(DAG)からの展開はライブラリの範囲外です。
+- 配布物(`dist/index.js`)は単一モジュールで、先頭で `SpreadsheetGrid` を import します。比較フックを初期バンドルに、`ComparisonView` を `React.lazy` のチャンクに分けると、バンドラはモジュール単位で配置するためライブラリ丸ごと(+ spreadsheet-grid)が初期バンドル側に入り、分割が効きません。フックとビューは同じチャンク(画面単位の lazy)に置いてください(`docs/DESIGN_NOTES.md` 7 章)。
 
 ## Phase 2
 

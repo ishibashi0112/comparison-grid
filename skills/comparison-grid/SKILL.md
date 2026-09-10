@@ -57,6 +57,8 @@ const comparison = useComparison<Row>({
 6. 木モードは「展開済み・出現 1 回 = 1 行」のデータ前提。破綻は `buildComparisonTree(...).issues` に出るが修復されない。
 7. 3 構成以上の意味論: `mode: 'base'`(既定)は「基準から見て何が変わったか」、`mode: 'all'` は「全構成に存在し全構成で一致するときだけ同一」。ユーザーの意図がどちらか確認してから選ぶ。
 8. 色は CSS 変数 `--cmpg-*`(`.cmpg-pane` / `.cmpg-grid` に定義)で上書きする。クラス名は `CMPG_CLASS_NAMES` を参照し、文字列を直書きしない。
+9. **lazy 分割**: 配布物は単一モジュールなので、比較フック(`useComparison` 等)を初期バンドルに、`ComparisonView` を `React.lazy` のチャンクに分けると、ライブラリ丸ごと(+ spreadsheet-grid)が初期バンドル側に入って分割が効かない。フックとビューは同じチャンクに置く(画面単位で lazy にする)。
+10. **jsdom テストの行数**: ピン留め列(`pinned`)があると `.ssg-body-row` はセクションごとに描画され行数が倍に見える。行数は `data-row-index` の一意な数で数える。
 
 ## 4. 差分の形(判定結果を自作 UI で使うとき)
 
