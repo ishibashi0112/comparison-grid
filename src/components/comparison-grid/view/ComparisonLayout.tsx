@@ -69,6 +69,7 @@ export function ComparisonLayoutRoot<T extends object>(props: ComparisonLayoutRo
     enableFieldCellHighlight,
     showDiffLabelColumn,
     diffLabelColumn,
+    excludePlaceholderRowsOnCopy,
   } = props;
 
   // 正規化の依存は「モデルの中身」にする(利用側が comparison をインラインで組んでも再正規化しない)。
@@ -107,6 +108,7 @@ export function ComparisonLayoutRoot<T extends object>(props: ComparisonLayoutRo
       enableFieldCellHighlight,
       showDiffLabelColumn,
       diffLabelColumn,
+      excludePlaceholderRowsOnCopy,
     }),
     [
       enableRowHighlight,
@@ -114,6 +116,7 @@ export function ComparisonLayoutRoot<T extends object>(props: ComparisonLayoutRo
       enableFieldCellHighlight,
       showDiffLabelColumn,
       diffLabelColumn,
+      excludePlaceholderRowsOnCopy,
     ],
   );
 

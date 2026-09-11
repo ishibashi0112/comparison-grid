@@ -49,6 +49,7 @@ export function ComparisonView<T extends object>(props: ComparisonViewProps<T>) 
     enableScrollSync = false,
     showDiffLabelColumn,
     diffLabelColumn,
+    excludePlaceholderRowsOnCopy,
   } = props;
   const showHeader = leftHeader !== undefined || rightHeader !== undefined;
 
@@ -67,6 +68,7 @@ export function ComparisonView<T extends object>(props: ComparisonViewProps<T>) 
       enableFieldCellHighlight={enableFieldCellHighlight}
       showDiffLabelColumn={showDiffLabelColumn}
       diffLabelColumn={diffLabelColumn}
+      excludePlaceholderRowsOnCopy={excludePlaceholderRowsOnCopy}
     >
       <ComparisonLayoutPane side="left">
         {showHeader ? <ComparisonLayoutHeader>{leftHeader}</ComparisonLayoutHeader> : null}

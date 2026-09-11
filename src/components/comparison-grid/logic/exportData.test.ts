@@ -82,6 +82,26 @@ describe('getComparisonExportData', () => {
     expect(data.rows[2].every((cell) => cell.text === '')).toBe(true);
     expect(data.rows[2].every((cell) => cell.value === undefined || cell.value === '')).toBe(true);
   });
+
+  it('excludeRows にプレースホルダの Set を渡すと、その行が出力から行ごと除かれる', () => {
+    const aligned = alignComparisonRows(result.annotatedLeft, result.annotatedRight);
+    const rightRows = aligned.pairs.map((pair) => pair.right);
+    const data = getComparisonExportData<Row>({
+      rows: rightRows,
+      diffs: result.rightDiffs,
+      columns: columns.slice(0, 2),
+      excludeRows: aligned.placeholders.right,
+    });
+    expect(data.rows.map((cells) => cells[0].text)).toEqual(['A', 'B', 'D']);
+    // 空の Set なら従来どおり。
+    const unchanged = getComparisonExportData<Row>({
+      rows: rightRows,
+      diffs: result.rightDiffs,
+      columns: columns.slice(0, 2),
+      excludeRows: new Set(),
+    });
+    expect(unchanged.rows).toHaveLength(4);
+  });
 });
 
 describe('getComparisonExportData: 木モードのロールアップ', () => {

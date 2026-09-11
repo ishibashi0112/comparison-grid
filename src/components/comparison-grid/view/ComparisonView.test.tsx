@@ -5,7 +5,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
-import type { GridColumn } from '@ishibashi0112/spreadsheet-grid';
+import { createRef } from 'react';
+import type { GridColumn, SpreadsheetGridHandle } from '@ishibashi0112/spreadsheet-grid';
 import { installJsdomLayoutStubs } from '@ishibashi0112/spreadsheet-grid/testing';
 import { ComparisonView } from './ComparisonView';
 import { useComparison } from '../hooks/useComparison';
@@ -161,6 +162,33 @@ describe('ComparisonView', () => {
     // 両ペインの本体行数が一致する(左 3 + 1 / 右 3 + 1)。
     expect(cellsIn(container, 'left', '.ssg-body-row')).toHaveLength(4);
     expect(cellsIn(container, 'right', '.ssg-body-row')).toHaveLength(4);
+  });
+
+  it('excludePlaceholderRowsOnCopy でグリッドのコピー / エクスポート対象からプレースホルダ行が除かれる', () => {
+    // コピー(Ctrl+C)/ exportCsv / getExportData は同じ isRowExportable を通るため、getExportData で検証する。
+    const leftRef = createRef<SpreadsheetGridHandle<Row>>();
+    const rightRef = createRef<SpreadsheetGridHandle<Row>>();
+    render(
+      <Harness
+        alignRows
+        excludePlaceholderRowsOnCopy
+        leftGridProps={{ ref: leftRef }}
+        rightGridProps={{ ref: rightRef }}
+      />,
+    );
+    // 左: A / B / C(+ プレースホルダ 1)。右: A / B / D(+ プレースホルダ 1)。表示は 4 行、出力は 3 行。
+    const leftData = leftRef.current?.getExportData({ scope: 'view' });
+    expect(leftData?.rows.map((cells) => cells[0].text)).toEqual(['A', 'B', 'C']);
+    const rightData = rightRef.current?.getExportData({ scope: 'view' });
+    expect(rightData?.rows.map((cells) => cells[0].text)).toEqual(['A', 'B', 'D']);
+    expect(leftRef.current?.exportCsv({ includeHeaders: false }).split(/\r?\n/).filter(Boolean)).toHaveLength(3);
+  });
+
+  it('excludePlaceholderRowsOnCopy 未指定ではプレースホルダ行も出力に含まれる(従来どおり)', () => {
+    const leftRef = createRef<SpreadsheetGridHandle<Row>>();
+    render(<Harness alignRows leftGridProps={{ ref: leftRef }} />);
+    const leftData = leftRef.current?.getExportData({ scope: 'view' });
+    expect(leftData?.rows.map((cells) => cells[0].text)).toEqual(['A', 'B', 'C', '']);
   });
 
   it('alignRows + showDiffOnly は same の対だけが両ペインから消える', () => {

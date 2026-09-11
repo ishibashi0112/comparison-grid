@@ -18,7 +18,8 @@
 | 次 / 前の差分へスクロール | `useComparisonNavigation`(2 構成)/ `useMultiComparisonNavigation`(N 構成。`useComparisonScrollSyncGroup` の `getHandle` と共有可) | [examples/05](../../../examples/05-grid-2x2-navigation.tsx) |
 | DOM を完全に自前にする(ライブラリからは grid props だけ受け取る) | `useComparisonPane` + `useComparisonScrollSync`(2 構成)/ `useComparisonScrollSyncMany`(N 構成) | [examples/06](../../../examples/06-headless-own-grid.tsx) |
 | React なしで判定だけ使う(Node / Worker / テスト) | `compare` / `alignComparisonRows` / `compareMany` / `alignComparisonRowsMany` / `buildComparisonTree` / `flattenComparisonTree` | — |
-| CSV / Excel に出す | `getComparisonExportData`(grid の `getExportData()` と同形) | [examples/07](../../../examples/07-export-csv.tsx) |
+| CSV / Excel に出す | `getComparisonExportData`(grid の `getExportData()` と同形。`excludeRows` でプレースホルダ行を除ける) | [examples/07](../../../examples/07-export-csv.tsx) |
+| 整列モードの空行(プレースホルダ)を Ctrl+C / CSV に含めない | `excludePlaceholderRowsOnCopy`(`ComparisonView` / `ComparisonLayout.Root` / `useComparisonPane`) | — |
 | ユーザーが手入力したリストをマスタと比べる | `useManualRows` + `useComparison` | [examples/08](../../../examples/08-manual-input.tsx) |
 | 色・余白・クラスを変える | `--cmpg-*` トークン / `CMPG_CLASS_NAMES` / `.cmpg-colors-cvd` / `style.layer.css` | [README「Styles」](../../../README.md#styles) |
 | Root 配下に自作のツールバー / 集計を置く | `useComparisonLayout()` / `useComparisonLayoutSide()` | [examples/04](../../../examples/04-multi-all.tsx) |
@@ -233,8 +234,9 @@ type ComparisonMultiLabels = {
 | `showDiffLabelColumn` | `boolean` | **`true`** | 差分ラベル列を含める(ペインの既定 `false` と異なる)。 |
 | `diffLabelColumn` | `DiffLabelColumnOptions<T>` | — | ラベル列の調整(`key` / `title` / `position` / `descendantDiffLabel` を使用)。 |
 | `descendantDiffCounts` | `ReadonlyMap<T, number>` | — | 木モードのロールアップ。渡すとラベル列に配下差分ラベルが入る(ペインと同じ規則)。 |
+| `excludeRows` | `ReadonlySet<T>` | — | 出力から行ごと除く行(同一性で判定)。整列済み配列を渡しつつプレースホルダ行を落としたいときに `placeholders.left` 等を渡す(ペインの `excludePlaceholderRowsOnCopy` と対)。 |
 
-セルの規則: `value` は `getValue ?? row[key]`、`text` は本体の**セル表示**と同じく `value == null` なら `''`(`valueFormatter` を通さない)、それ以外は `valueFormatter({ value, row, column }) ?? String(value)`。列見出しは `title ?? key`。プレースホルダ行(alignRows)は全セル空になります。
+セルの規則: `value` は `getValue ?? row[key]`、`text` は本体の**セル表示**と同じく `value == null` なら `''`(`valueFormatter` を通さない)、それ以外は `valueFormatter({ value, row, column }) ?? String(value)`。列見出しは `title ?? key`。プレースホルダ行(alignRows)は全セル空になります(`excludeRows` で除けます)。
 
 ## 階層比較(木)
 
@@ -496,7 +498,7 @@ const pane = useComparisonPane<Row>({
 <SpreadsheetGrid<Row> {...pane.gridProps} />;
 ```
 
-`UseComparisonPaneOptions<T>` = `ComparisonPaneProps<T>` から `side` / `header` / `showHeader` / `className` / `style` を除いたもの(`rows` / `diffs` / `columns` / `compareFields` / `keyColumnKeys` / `placeholderRows` / `contextRows` / `descendantDiffCounts` / `gridProps` / `enable*` / `showDiffLabelColumn` / `diffLabelColumn`。各項目の意味は `ComparisonPane` を参照)。
+`UseComparisonPaneOptions<T>` = `ComparisonPaneProps<T>` から `side` / `header` / `showHeader` / `className` / `style` を除いたもの(`rows` / `diffs` / `columns` / `compareFields` / `keyColumnKeys` / `placeholderRows` / `contextRows` / `descendantDiffCounts` / `gridProps` / `enable*` / `showDiffLabelColumn` / `diffLabelColumn` / `excludePlaceholderRowsOnCopy`。各項目の意味は `ComparisonPane` を参照)。
 
 | 戻り値 | Type | Description |
 | --- | --- | --- |
@@ -506,6 +508,8 @@ const pane = useComparisonPane<Row>({
 | `getDiff` | `(row: T) => ComparisonAnyRowDiff<T> \| undefined` | この側の差分を引く参照関数。`renderCell` 内で差分に応じた描画をするときに。batch 22 から `diffs` は 2-way / N 構成のどちらの Map でも受け付けるため、型は Union(`'side' in diff` で 2-way と判別)。 |
 
 差分ハイライトの CSS トークン(`--cmpg-*`)は `.cmpg-pane` に加えて `.cmpg-grid`(= `gridProps.className`)にも定義されているため、ラッパー無しでもハイライトが効きます。`.cmpg-colors-cvd` もグリッド root(またはその祖先)に付与できます。
+
+`excludePlaceholderRowsOnCopy: true` のときは `gridProps.isRowExportable`(spreadsheet-grid v0.33.0)にプレースホルダ判定を合成して返します(利用側の `isRowExportable` があれば AND)。付与するものが無ければ `isRowExportable` キー自体を足しません。
 
 ### `useComparisonScrollSync<T>(options?): UseComparisonScrollSyncResult<T>`
 
@@ -571,7 +575,7 @@ const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows 
 | `layout` | `'horizontal' \| 'vertical'` | `'horizontal'` | 横並びは**子の数だけ等幅カラム**(`grid-auto-flow: column`)、縦並びは 1 カラムに積む。 |
 | `enableScrollSync` | `boolean` | `false` | 全ペインのスクロール同期(軸は layout に依る)。Root が `useComparisonScrollSyncGroup` を生成する。 |
 | `scrollSyncGroup` | `ComparisonScrollSyncGroup<T>` | — | 外で作ったグループを注入(`useMultiComparisonNavigation({ getHandle: group.getHandle })` と共有するとき)。渡すと `enableScrollSync` / layout の軸設定は無視され、グループ自身の設定が使われる。 |
-| `enableRowHighlight` / `enableKeyCellHighlight` / `enableFieldCellHighlight` / `showDiffLabelColumn` / `diffLabelColumn` | | | `ComparisonView` と同じ(全ペイン共通)。 |
+| `enableRowHighlight` / `enableKeyCellHighlight` / `enableFieldCellHighlight` / `showDiffLabelColumn` / `diffLabelColumn` / `excludePlaceholderRowsOnCopy` | | | `ComparisonView` と同じ(全ペイン共通)。 |
 | `gridProps` | `ComparisonGridProps<T>` | — | 全ペイン共通の grid props(Grid の `gridProps` が上にマージ)。 |
 | `className` / `style` / `children` | | | ルート `.cmpg-view .cmpg-view--{layout}`(`data-cmpg-layout`)。 |
 
@@ -581,7 +585,7 @@ const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows 
 
 **`ComparisonLayoutGrid<T>`**(`ComparisonLayoutGridProps<T>` = `{ side?, gridProps?, className?, style? }`): `.cmpg-pane-body` + `SpreadsheetGrid`。`side` は Pane 配下では省略可、Pane 無し(自前ラッパー)では必須。本体は `useComparisonPane` + `useSyncedGridProps`(同期 OFF でもハンドルは同期グループに登録されるため、`useMultiComparisonNavigation` の `getHandle` で引ける)。Root 外・存在しない構成 ID・side 不明は日本語メッセージの例外。
 
-**フック / 補助**: `useComparisonLayout<T>()`(Root が配る `ComparisonLayoutContextValue<T>` = `{ sides, getSide, columns, keyColumnKeys, compareFields, highlight, gridProps, layout, scrollSyncGroup }`。自作のツールバー / 集計表示に)/ `useComparisonLayoutSide()`(現在の Pane の構成 ID)/ `normalizeLayoutSides(model)`(2-way / N 構成のモデルを `ComparisonLayoutSide<T>[]` に正規化する純関数)。
+**フック / 補助**: `useComparisonLayout<T>()`(Root が配る `ComparisonLayoutContextValue<T>` = `{ sides, getSide, columns, keyColumnKeys, compareFields, highlight, gridProps, layout, scrollSyncGroup }`。`highlight` は `enable*` / `showDiffLabelColumn` / `diffLabelColumn` / `excludePlaceholderRowsOnCopy` の束。自作のツールバー / 集計表示に)/ `useComparisonLayoutSide()`(現在の Pane の構成 ID)/ `normalizeLayoutSides(model)`(2-way / N 構成のモデルを `ComparisonLayoutSide<T>[]` に正規化する純関数)。
 
 ### `ComparisonView<T extends object>`
 
@@ -601,6 +605,7 @@ const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows 
 | `enableRowHighlight` | `boolean` | `true` | `same` 以外の行へ `.cmpg-row-diff` を付与。 |
 | `enableKeyCellHighlight` | `boolean` | `true` | `keyColumnKeys` 列のセル強調。 |
 | `enableFieldCellHighlight` | `boolean` | `true` | `compareFields` 対応列のセル強調。 |
+| `excludePlaceholderRowsOnCopy` | `boolean` | `false` | `alignRows` のプレースホルダ行(グレーの空行)を、グリッドの**コピー**(`Ctrl/⌘+C` の TSV。左上コーナーの全選択 / 列選択 / 行選択いずれも)/ `exportCsv` / `getExportData` の出力から行ごと除く。片側だけを Excel 等へ貼るときに空行が混じらないようにする用途。左右を横に並べて貼りたい(行位置を保ちたい)ときは既定の `false` のまま。実体は spreadsheet-grid v0.33.0 の `isRowExportable` で、利用側の `gridProps.isRowExportable` とは AND で合成される。`useComparisonPane` / `ComparisonPane` / `ComparisonLayout.Root` でも同名。 |
 | `enableScrollSync` | `boolean` | `false` | 両ペインのスクロールを同期する(`alignRows` との併用を想定)。同期する軸は `layout` に依る: `'horizontal'` は**縦**(top)のみ(横は同期しない)、`'vertical'` は**縦横**(top / left)両方(縦並びでは列が上下に揃うため横も合わせる)。`source: 'user'` のスクロールだけ相手の `setScrollPosition()` へ伝え、`'api'` 由来は無視してループを防ぐ(spreadsheet-grid v0.29.0 のスクロール API)。利用側の `ref` / `onScroll`(`gridProps` / 片側 props)はそのまま透過・合成される。 |
 | `className` / `style` | `string` / `CSSProperties` | — | ルート(`.cmpg-view`)へ。 |
 
@@ -624,7 +629,7 @@ const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows 
 | `header` | `ReactNode` | — | ヘッダースロット。 |
 | `showHeader` | `boolean` | `header !== undefined` | スロットの描画有無(片側だけヘッダーがある場合の高さ揃えに)。 |
 | `gridProps` | `ComparisonGridProps<T>` | — | 透過 props。 |
-| `showDiffLabelColumn` / `diffLabelColumn` / `enable*` | — | — | `ComparisonView` と同じ。 |
+| `showDiffLabelColumn` / `diffLabelColumn` / `enable*` / `excludePlaceholderRowsOnCopy` | — | — | `ComparisonView` と同じ。 |
 | `className` / `style` | — | — | ルート(`.cmpg-pane`)へ。 |
 
 ### gridProps の透過(`ComparisonGridProps<T>`)
@@ -637,6 +642,7 @@ const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows 
 | `dataSource` | serverSide モードは比較と両立しないため除外。 |
 | `getRowClassName` | ライブラリの行クラスと**合成**(`'cmpg-row-diff cmpg-row-diff--field your-class'`)。第 3 引数 `ctx: RowStyleContext<T>`(spreadsheet-grid v0.29.0)も利用側の関数へそのまま透過。 |
 | `className` | `'cmpg-grid your-class'` に合成。 |
+| `isRowExportable` | `excludePlaceholderRowsOnCopy` のときだけライブラリのプレースホルダ判定と **AND で合成**(spreadsheet-grid v0.33.0)。それ以外はそのまま透過。 |
 | 列の `cellClassName` | 強調対象列だけライブラリのクラスと合成(文字列 / 関数どちらも可)。対象外の列は同一参照で通過。 |
 | それ以外 | そのまま透過(`theme` / `density` / `enable*` / `show*` / `ref` / `onStateChange` / `getContextMenuItems` …)。 |
 
@@ -704,6 +710,7 @@ const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows 
 - `T` はオブジェクトである必要があります(`SpreadsheetGrid<T extends object>` の要求と同じ。`compare()` 単体は任意の `T` で動きます)。
 - 左右の行の位置は既定では揃えません(ss2602 と同じ)。揃えたい場合は `alignRows: true`(左右整列モード)。プレースホルダ行は差分 Map に載らないため `getDiff()` は `undefined` を返します(`placeholders` の Set で判定してください)。
 - `alignRows` のプレースホルダ行は既定で `{} as T` です。`row.foo.bar` のような入れ子アクセスをする `getValue` / `renderCell` / `valueFormatter` がある列では `createPlaceholderRow` で安全な行を返してください。
+- `alignRows` のプレースホルダ行はグリッドから見ると通常の行なので、既定では `Ctrl/⌘+C` / `exportCsv` / `getExportData` に空行として含まれます。除きたいときは `excludePlaceholderRowsOnCopy`(グリッド側)/ `getComparisonExportData` の `excludeRows`(ライブラリ側)を使ってください。
 - グリッドの行グルーピング(`rowGroup`)を有効にした場合、グループ行には差分クラスは付きません(leaf 行のみ)。
 - 木モード(`useTreeComparison`)の `visibleLeft` / `visibleRight` は平坦化した配列で、入力と同一参照にはなりません(木の参照が同じなら安定)。渡す木は `useMemo` で組み立ててください。
 - 木モードは「展開済みの、出現 1 回 = 1 行」のデータを前提にします。行が深さ優先順に並んでいない・親参照に品番を使っている等の破綻は `buildComparisonTree(...).issues` で**検出**できますが**修復**はされません。品目間の構成マスタ(DAG)からの展開はライブラリの範囲外です。
@@ -715,5 +722,7 @@ const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows 
 階層比較(`buildComparisonTree` / `flattenComparisonTree` / `alignComparisonTree` / `useTreeComparison`)は batch 15、ロールアップ(`countDescendantDiffs` / `.cmpg-row-rollup` / 配下差分ラベル)は batch 16a、折りたたみ(`collapsedKeys` / `isCollapsed` / `collectCollapsedDescendants`)は batch 16b で追加。展開ボタンの UI は利用側の列で組む(README レシピ)。
 
 ヘッドレス層(`useComparisonPane` / `useComparisonScrollSync`)は batch 18(2026-09-07)で追加。`ComparisonPane` / `ComparisonView` の振る舞いは変えず、本体をフックへ移して薄い包みにした。
+
+spreadsheet-grid v0.33.0(2026-09-11。comparison-grid からの提案 #10 / #11 を採用)に合わせ、batch 31 で `excludePlaceholderRowsOnCopy`(`isRowExportable` へのプレースホルダ判定の合成)と `getComparisonExportData` の `excludeRows` を追加。
 
 N 構成比較(3・4 構成)は batch 19(2026-09-07)で純ロジック(`compareMany` / `alignComparisonRowsMany`)、batch 20 で React 接続(`useMultiComparison`)、batch 21 でスクロール同期と差分ジャンプの N 対応(`useComparisonScrollSyncGroup` / `useComparisonScrollSyncMany` / `useMultiComparisonNavigation`)、batch 22 で合成コンポーネント(`ComparisonLayout.Root / .Pane / .Header / .Grid`。`ComparisonView` はそのプリセットに)を追加。batch 24(2026-09-09)で全構成一致判定 `mode: 'all'` を追加。木モードの N 化は後続(`docs/DESIGN_NOTES.md` 6 章)。

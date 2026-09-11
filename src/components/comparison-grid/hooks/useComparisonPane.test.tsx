@@ -126,3 +126,63 @@ describe('useComparisonPane', () => {
     expect(labels).toContain('左のみ');
   });
 });
+
+describe('useComparisonPane: excludePlaceholderRowsOnCopy(isRowExportable の合成)', () => {
+  const placeholder = {} as Row;
+  const rowsWithPlaceholder = [left[0], placeholder, left[1]];
+  const placeholderRows: ReadonlySet<Row> = new Set([placeholder]);
+  const ctx = { viewRowIndex: 0, rowKey: 0 };
+
+  it('既定では isRowExportable を付与しない(利用側のものがあればそのまま透過)', () => {
+    const { result: hook } = renderHook(() =>
+      useComparisonPane<Row>(baseOptions({ rows: rowsWithPlaceholder, placeholderRows })),
+    );
+    expect('isRowExportable' in hook.current.gridProps).toBe(false);
+
+    const userIsRowExportable = (r: Row) => r.id !== 'A';
+    const { result: withUser } = renderHook(() =>
+      useComparisonPane<Row>(
+        baseOptions({
+          rows: rowsWithPlaceholder,
+          placeholderRows,
+          gridProps: { isRowExportable: userIsRowExportable },
+        }),
+      ),
+    );
+    expect(withUser.current.gridProps.isRowExportable).toBe(userIsRowExportable);
+  });
+
+  it('true でプレースホルダ行だけ false を返し、利用側の isRowExportable とは AND になる', () => {
+    const { result: hook } = renderHook(() =>
+      useComparisonPane<Row>(
+        baseOptions({ rows: rowsWithPlaceholder, placeholderRows, excludePlaceholderRowsOnCopy: true }),
+      ),
+    );
+    const isRowExportable = hook.current.gridProps.isRowExportable;
+    expect(isRowExportable?.(placeholder, ctx)).toBe(false);
+    expect(isRowExportable?.(left[0], ctx)).toBe(true);
+    expect(isRowExportable?.(left[1], ctx)).toBe(true);
+
+    const { result: withUser } = renderHook(() =>
+      useComparisonPane<Row>(
+        baseOptions({
+          rows: rowsWithPlaceholder,
+          placeholderRows,
+          excludePlaceholderRowsOnCopy: true,
+          gridProps: { isRowExportable: (r) => r.id !== 'A' },
+        }),
+      ),
+    );
+    const composed = withUser.current.gridProps.isRowExportable;
+    expect(composed?.(placeholder, ctx)).toBe(false);
+    expect(composed?.(left[0], ctx)).toBe(false);
+    expect(composed?.(left[1], ctx)).toBe(true);
+  });
+
+  it('placeholderRows が無ければ true でも何もしない', () => {
+    const { result: hook } = renderHook(() =>
+      useComparisonPane<Row>(baseOptions({ excludePlaceholderRowsOnCopy: true })),
+    );
+    expect('isRowExportable' in hook.current.gridProps).toBe(false);
+  });
+});

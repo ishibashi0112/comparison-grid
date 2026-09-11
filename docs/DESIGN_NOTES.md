@@ -46,8 +46,8 @@
 7. **`title: ''` の列ヘッダーが `key` にフォールバックする。** ボタン専用列(ss2602 の `__detail`)で空タイトルにすると `__detail` が見出しに出る。空文字は「見出しなし」として扱うか、API_REFERENCE に明記すると親切(デモでは `title: 'マスタ'` で回避)。
 8. **スクロール同期 API(Phase 2 向け)。** 左右整列モードでは 2 グリッドの縦スクロールを同期したい。ハンドルに `getScrollPosition()` / `setScrollPosition({ top, left })`、props に `onScroll` があると実装できる(現状は `scrollToRow` / `scrollToCell` のみ)。
 9. **pointerdown 時の `focus()` に `preventScroll: true`(2026-08-30・v0.29.0 で確認)。** グリッド root(`.ssg-shell`)が viewport に収まりきっていない状態でセルを 1 回クリックすると、`focus()` の既定動作でページがスクロールし、ポインタ直下に来たセルへの `pointerenter` が `selection` ドラッグ中の `updateSelection` を呼んで**単クリックが数行の範囲選択になる**(Playwright + Chrome で再現: viewport 900px / root 下端 934px → スクロール 33px・選択 2 行)。`useGridPointerInteractions.ts` の pointerdown 3 箇所を `focus({ preventScroll: true })` にすれば解消(capture 段階の先行フォーカスで検証済み)。詳細は `docs/SPREADSHEET_GRID_PROPOSALS.md` #9。**v0.29.1(2026-08-30)で採用済み**: peer 範囲を `>=0.29.1 <1.0.0` へ更新し、実ブラウザで解消を確認(暫定回避は入れていない)。
-10. **行ホバーの controlled 化 `hoveredRowIndex` / `onHoveredRowChange`(2026-09-11 追記・v0.32.0)。** 左右整列モードで「片側をホバーしたら相手ペインの同じ行位置も光らせる」オプション(ホバー同期)を作りたいが、行ホバーは内部 `useState` のみで読む / 書く手段がない。利用側だけでやるなら `data-row-index` の DOM 依存 + `getRowClassName` 経由の再レンダー増になるため、controlled prop 対を提案。採用後は `useComparisonHoverSync` + `enableHoverSync`(既定 false)で接続する。詳細は `docs/SPREADSHEET_GRID_PROPOSALS.md` #10。
-11. **コピー / CSV / getExportData の行フィルタ `isRowExportable(row, ctx)`(2026-09-11 追記・v0.32.0)。** 整列モードのプレースホルダ行が全選択 / 列選択 / 行選択の Ctrl+C で空行として混じる。「プレースホルダ行を除いてコピー」オプション(既定 false)を作りたいが、行を除外するフックがなく、利用側で Ctrl+C を横取りするとコピー整形の二重実装になる。行述語 1 つを 3 経路共通で適用する形を提案。採用後は `useComparisonPane` が `isRowExportable: (row) => !placeholderRows.has(row)` を流す(`excludePlaceholderRowsOnCopy`)。詳細は同 #11。
+10. **行ホバーの controlled 化 `hoveredRowIndex` / `onHoveredRowChange`(2026-09-11 追記・v0.32.0)。** 左右整列モードで「片側をホバーしたら相手ペインの同じ行位置も光らせる」オプション(ホバー同期)を作りたいが、行ホバーは内部 `useState` のみで読む / 書く手段がない。利用側だけでやるなら `data-row-index` の DOM 依存 + `getRowClassName` 経由の再レンダー増になるため、controlled prop 対を提案。採用後は `useComparisonHoverSync` + `enableHoverSync`(既定 false)で接続する。詳細は `docs/SPREADSHEET_GRID_PROPOSALS.md` #10。**v0.33.0(2026-09-11)で採用済み**(`hoveredRowIndex` / `onHoveredRowChange`。提案どおりの形)。
+11. **コピー / CSV / getExportData の行フィルタ `isRowExportable(row, ctx)`(2026-09-11 追記・v0.32.0)。** 整列モードのプレースホルダ行が全選択 / 列選択 / 行選択の Ctrl+C で空行として混じる。「プレースホルダ行を除いてコピー」オプション(既定 false)を作りたいが、行を除外するフックがなく、利用側で Ctrl+C を横取りするとコピー整形の二重実装になる。行述語 1 つを 3 経路共通で適用する形を提案。採用後は `useComparisonPane` が `isRowExportable: (row) => !placeholderRows.has(row)` を流す(`excludePlaceholderRowsOnCopy`)。詳細は同 #11。**v0.33.0(2026-09-11)で採用済み**(`isRowExportable(row, { viewRowIndex, rowKey })`。コピー / exportCsv / getExportData の 3 経路共通、行単位、貼り付けと全選択判定には影響なし)。peer 下限を `>=0.33.0 <1.0.0` へ更新し、batch 31 で `excludePlaceholderRowsOnCopy` を接続。
 
 ## 5. Phase 2 候補と実装記録
 
@@ -205,6 +205,14 @@
 - **SKILL.md**(Claude Code のスキル形式。frontmatter に name / description)。利用側が自分のプロジェクトの `.claude/skills/` にコピーして使う前提で、一次情報(同梱の examples / llms-full.txt / d.ts)への導線、用途 → API 表、最小コード、落とし穴 8 点、差分型の形を書いた。API_REFERENCE の索引と同じ表を持つため、公開 API を変えたら両方を直す(CLAUDE.md の厳守事項に追記)。
 - **llms.txt / llms-full.txt** は `scripts/emit-llms.mjs` の生成物。`build:lib` の最終ステップに組み込み(`prepublishOnly` → `build:lib` で publish 時に必ず最新になる)。手で編集しない。`llms-full.txt` は README + API_REFERENCE + examples/README + SKILL の結合で、AI が 1 ファイルで全体を読める。
 - npm 配布物: `files` に `examples` / `skills` / `llms.txt` / `llms-full.txt` を追加。README(英日)に「AI アシスタント向け」節。
+
+### 実装済み(2026-09-11・batch 31。プレースホルダ行を除いたコピー `excludePlaceholderRowsOnCopy`)
+
+- spreadsheet-grid v0.33.0(提案 #11 `isRowExportable` 採用)に合わせて peer を `>=0.33.0 <1.0.0`、devDependency を `^0.33.0` へ。
+- `useComparisonPane` に `excludePlaceholderRowsOnCopy`(既定 false)。true のときだけ `gridProps.isRowExportable` にプレースホルダ判定(`!placeholderRows.has(row)`)を合成し、利用側の `isRowExportable` があれば AND。付与するものが無ければキー自体を足さない(gridProps の形を変えない)。`ComparisonView` / `ComparisonLayout.Root`(Context の `highlight` 束経由)/ `ComparisonPane` でも同名。
+- `getComparisonExportData` に `excludeRows?: ReadonlySet<T>`(同一性で行ごと除く)。ライブラリ側エクスポートとグリッド側コピーで同じ結果にできる。
+- 既定 OFF にした理由: 片側だけを貼る用途では空行が邪魔だが、左右を横に並べて貼る用途では空行があるほうが行位置が保たれる(用途で割れる)。
+- 型 `ComparisonCopyOptions` を公開。デモ(2 構成 / N 構成)に「空行を除いてコピー」トグル(整列 OFF では無効)。
 
 ## 6. 検討中(2026-09-09。batch 19〜28 で 6-3 の 1〜5 + (B) + ドキュメント整備を実装済み — 残りは 6 の木モード N 化)
 

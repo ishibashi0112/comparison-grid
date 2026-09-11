@@ -41,7 +41,14 @@ spreadsheet-grid **v0.29.0**(コミット「proposals batch 1〜6」・2026-08-2
 
 #9 は v0.29.1 公開後に comparison-grid 側で peer 範囲を `>=0.29.1 <1.0.0` へ更新し、同じ Playwright スクリプト(viewport 900px / root 下端 934px でセルを 1 クリック)で **スクロール 0 / 選択 1 行** を確認済み(修正前は 33px / 2 行)。comparison-grid 側の暫定回避は入れていなかったため、外すものはない。
 
-#10・#11 は 2026-09-11 に追記した未提出分(対象 v0.32.0)。採用されるまで comparison-grid 側には回り道(各項目の「利用側だけで実現する場合の回り道」)を入れない方針(二重実装 / 内部 DOM 依存を避けるため)。
+#10・#11 は 2026-09-11 に追記し、同日 spreadsheet-grid **v0.33.0**(proposals batch 8 / 9)で採用された。
+
+| # | 結果 | 内容 |
+| --- | --- | --- |
+| 10 | ✅ 採用(batch 8・**v0.33.0**・2026-09-11) | `hoveredRowIndex?: number \| null`(optionally controlled)/ `onHoveredRowChange?: (viewRowIndex, { source: 'pointer' })`(同値抑止・`enableRowHover: false` では無効・`GridState` / ハンドルには載せない)。提案どおりの形 |
+| 11 | ✅ 採用(batch 9・**v0.33.0**・2026-09-11) | `isRowExportable?: (row, { viewRowIndex, rowKey }) => boolean`。コピー(全選択 / セル範囲 / 行選択 / 列選択)/ `exportCsv` / `getExportData` の 3 経路共通、行単位、貼り付けと全選択判定には影響なし(scope `'raw'` のみ `viewRowIndex` がソース index) |
+
+採用時の comparison-grid 側の対応: peer 範囲を `>=0.33.0 <1.0.0` へ更新し、#11 は batch 31 で `excludePlaceholderRowsOnCopy`(`useComparisonPane` が `isRowExportable` を合成)を接続。回り道は入れていなかったため、外すものはない。
 
 ---
 

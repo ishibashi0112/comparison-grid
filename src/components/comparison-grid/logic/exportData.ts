@@ -5,6 +5,7 @@
 //     (プレースホルダ行の undefined を formatter が整形してしまわないように。)列見出しは title ?? key。
 //   - 差分ラベル列は既定で含めます(insertDiffLabelColumn を流用。位置 / 見出しはペインと同じ規則)。
 //   - alignRows の整列済み配列を渡せば対順のエクスポートになります(プレースホルダ行は全セル空)。
+//     excludeRows(同一性の Set)に載る行は出力から行ごと除きます(プレースホルダ行を落としたいとき)。
 import type { GridColumn, GridExportData } from '@ishibashi0112/spreadsheet-grid';
 import type { ComparisonExportOptions } from '../model/types';
 import { insertDiffLabelColumn } from './paneColumns';
@@ -24,7 +25,9 @@ export function getComparisonExportData<T>(options: ComparisonExportOptions<T>):
     showDiffLabelColumn = true,
     diffLabelColumn,
     descendantDiffCounts,
+    excludeRows,
   } = options;
+  const exportRows = excludeRows ? rows.filter((row) => !excludeRows.has(row)) : rows;
   const visibleColumns = columns.filter((column) => column.visible !== false);
   const exportColumns = showDiffLabelColumn
     ? insertDiffLabelColumn(visibleColumns, diffs, diffLabelColumn, descendantDiffCounts)
@@ -35,7 +38,7 @@ export function getComparisonExportData<T>(options: ComparisonExportOptions<T>):
       key: column.key,
       title: column.title ?? column.key,
     })),
-    rows: rows.map((row) =>
+    rows: exportRows.map((row) =>
       exportColumns.map((column) => {
         const value = readCellValue(column, row);
         const text =

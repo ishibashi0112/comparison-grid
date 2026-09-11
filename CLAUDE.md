@@ -6,7 +6,7 @@
 
 - React 19 / TypeScript 6 / Vite 8。ツールチェーンは vite+(`vp` コマンド)。pnpm 11.12.0(`packageManager` で固定)。
 - Vitest 4(`pnpm-workspace.yaml` の overrides で vp 同梱バージョンへ pin)。jsdom は `.test.tsx` のみ(先頭 docblock `// @vitest-environment jsdom`)。
-- peer: `react` / `react-dom` `^19`、`@ishibashi0112/spreadsheet-grid` `>=0.29.1 <1.0.0`(0.x で minor が頻繁に上がるため `^` を使わない。0.29.1 = pointerdown の `focus({ preventScroll })` 修正)。devDependency は 0.32.0(2026-09-07 時点の npm latest。0.29.1 以降は追加のみ)。
+- peer: `react` / `react-dom` `^19`、`@ishibashi0112/spreadsheet-grid` `>=0.33.0 <1.0.0`(0.x で minor が頻繁に上がるため `^` を使わない。0.33.0 = 提案 #10 `hoveredRowIndex` / `onHoveredRowChange` と #11 `isRowExportable` の採用版。ホバー同期とプレースホルダ行除外コピーがこれに依存)。devDependency は 0.33.0(2026-09-11 時点の npm latest)。
 - 構成は spreadsheet-grid リポジトリ(`~/dev/datasheet-grid`)を踏襲: ライブラリ本体は `src/components/comparison-grid/`、ルートは playground デモ(`src/App.tsx`)、配布物は `vite.lib.config.ts` + `tsconfig.lib.json` で `dist/` に生成。
 
 ## 厳守事項

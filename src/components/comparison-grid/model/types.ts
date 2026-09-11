@@ -219,6 +219,16 @@ export type ComparisonDiffLabelColumnProps<T> = {
   diffLabelColumn?: DiffLabelColumnOptions<T>;
 };
 
+/** コピー / エクスポートの調整(useComparisonPane / ComparisonView / ComparisonLayout.Root 共通)。 */
+export type ComparisonCopyOptions = {
+  /** alignRows のプレースホルダ行を、グリッドのコピー(Ctrl/⌘+C の TSV)/ `exportCsv` / `getExportData` の
+   *  出力から行ごと除く(既定 false)。片側だけを Excel 等へ貼るときに空行が混じらないようにする用途。
+   *  実体は spreadsheet-grid v0.33.0 の `isRowExportable` にプレースホルダ判定を流すもので、利用側の
+   *  `gridProps.isRowExportable` があれば AND で合成する。`placeholderRows` が無いときは何もしない。
+   *  左右を横に並べて貼りたい(行位置を保ちたい)ときは既定の false のままにする。 */
+  excludePlaceholderRowsOnCopy?: boolean;
+};
+
 /** 差分ジャンプの 1 停止位置。index は visibleLeft / visibleRight 上の行位置。 */
 export type ComparisonDiffStop<T> = {
   kind: Exclude<ComparisonDiffKind, 'same'>;
@@ -321,12 +331,16 @@ export type ComparisonExportOptions<T> = {
   diffLabelColumn?: DiffLabelColumnOptions<T>;
   /** 木モードのロールアップ(`useTreeComparison().descendantDiffCounts.left` 等)。ラベル列の配下差分ラベルに使う。 */
   descendantDiffCounts?: ReadonlyMap<T, number>;
+  /** 出力から除く行(同一性で判定)。alignRows のプレースホルダ行を除きたいときに `placeholders.left` 等を渡す
+   *  (ペインの `excludePlaceholderRowsOnCopy` と対になる)。 */
+  excludeRows?: ReadonlySet<T>;
 };
 
 /** useComparisonPane のオプション。ComparisonPane の props から見た目(side / header / className / style)を
  *  除いたもので、「差分をどう合成するか」だけを受け取ります。 */
 export type UseComparisonPaneOptions<T extends object> = ComparisonHighlightOptions &
-  ComparisonDiffLabelColumnProps<T> & {
+  ComparisonDiffLabelColumnProps<T> &
+  ComparisonCopyOptions & {
     rows: readonly T[];
     /** この側の差分 Map。2-way(leftDiffs / rightDiffs)でも N 構成(side.diffs)でもよい。 */
     diffs: ComparisonAnyDiffMap<T>;
@@ -411,7 +425,8 @@ export type ComparisonViewModel<T> = Pick<
 export type ComparisonViewLayout = 'horizontal' | 'vertical';
 
 export type ComparisonViewProps<T extends object> = ComparisonHighlightOptions &
-  ComparisonDiffLabelColumnProps<T> & {
+  ComparisonDiffLabelColumnProps<T> &
+  ComparisonCopyOptions & {
     comparison: ComparisonViewModel<T>;
     columns: readonly GridColumn<T>[];
     keyColumnKeys?: readonly string[];
@@ -849,7 +864,8 @@ export type ComparisonLayoutSide<T> = {
 };
 
 export type ComparisonLayoutRootProps<T extends object> = ComparisonHighlightOptions &
-  ComparisonDiffLabelColumnProps<T> & {
+  ComparisonDiffLabelColumnProps<T> &
+  ComparisonCopyOptions & {
     comparison: ComparisonLayoutModel<T>;
     columns: readonly GridColumn<T>[];
     keyColumnKeys?: readonly string[];
@@ -899,7 +915,8 @@ export type ComparisonLayoutContextValue<T> = {
   columns: readonly GridColumn<T>[];
   keyColumnKeys?: readonly string[];
   compareFields?: readonly CompareField<T>[];
-  highlight: ComparisonHighlightOptions & ComparisonDiffLabelColumnProps<T>;
+  /** 全ペイン共通のペイン設定(ハイライト / 差分ラベル列 / コピー調整)。 */
+  highlight: ComparisonHighlightOptions & ComparisonDiffLabelColumnProps<T> & ComparisonCopyOptions;
   gridProps?: ComparisonGridProps<T>;
   layout: ComparisonViewLayout;
   scrollSyncGroup: ComparisonScrollSyncGroup<T>;

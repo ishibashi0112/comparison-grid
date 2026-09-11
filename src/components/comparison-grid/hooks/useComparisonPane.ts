@@ -4,7 +4,7 @@
 //   gridProps として返します。DOM(ラッパー / ヘッダー)は一切持たないため、自前レイアウトの
 //   SpreadsheetGrid にも同じ差分ハイライトを配線できます。
 import { useMemo } from 'react';
-import type { GridColumn } from '@ishibashi0112/spreadsheet-grid';
+import type { GridColumn, SpreadsheetGridProps } from '@ishibashi0112/spreadsheet-grid';
 import type {
   ComparisonAnyRowDiff,
   ComparisonPaneGridProps,
@@ -49,6 +49,7 @@ export function useComparisonPane<T extends object>(
     enableKeyCellHighlight = true,
     enableFieldCellHighlight = true,
     showDiffLabelColumn = false,
+    excludePlaceholderRowsOnCopy = false,
   } = options;
   const columns = useStableArray(options.columns);
   const compareFields = useStableArray(options.compareFields);
@@ -97,15 +98,27 @@ export function useComparisonPane<T extends object>(
     [userClassName],
   );
 
+  // コピー / エクスポートの行フィルタ(spreadsheet-grid v0.33.0 の isRowExportable)。excludePlaceholderRowsOnCopy
+  //   のときだけプレースホルダ判定を流し、利用側の isRowExportable があれば AND で合成する。付与するものが
+  //   無ければ利用側のものをそのまま返す(undefined を含む)。
+  const userIsRowExportable = gridProps?.isRowExportable;
+  const isRowExportable = useMemo<SpreadsheetGridProps<T>['isRowExportable']>(() => {
+    if (!excludePlaceholderRowsOnCopy || !placeholderRows) return userIsRowExportable;
+    return (row, ctx) =>
+      !placeholderRows.has(row) && (userIsRowExportable ? userIsRowExportable(row, ctx) : true);
+  }, [excludePlaceholderRowsOnCopy, placeholderRows, userIsRowExportable]);
+
   const composedGridProps = useMemo<ComparisonPaneGridProps<T>>(
     () => ({
       ...gridProps,
+      // isRowExportable は付与するものがあるときだけ載せる(無ければ gridProps のまま = キーを増やさない)。
+      ...(isRowExportable ? { isRowExportable } : undefined),
       rows,
       columns: composedColumns,
       getRowClassName,
       className,
     }),
-    [gridProps, rows, composedColumns, getRowClassName, className],
+    [gridProps, isRowExportable, rows, composedColumns, getRowClassName, className],
   );
 
   const getDiff = useMemo(

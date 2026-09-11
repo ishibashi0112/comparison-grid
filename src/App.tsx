@@ -219,6 +219,8 @@ function TreeComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cvdColors:
   const [alignRows, setAlignRows] = useState(false);
   const [syncScroll, setSyncScroll] = useState(false);
   const [verticalLayout, setVerticalLayout] = useState(false);
+  // 左右整列時のプレースホルダ行をコピー / エクスポートから除く(spreadsheet-grid 0.33.0 の isRowExportable)。
+  const [excludePlaceholderCopy, setExcludePlaceholderCopy] = useState(false);
   // 折りたたみ: 突き合わせキー(matchKey)の集合を利用側の state で持つ。
   const [collapsedKeys, setCollapsedKeys] = useState<ReadonlySet<string>>(() => new Set());
   const toggleCollapsed = useCallback((key: string) => {
@@ -415,6 +417,18 @@ function TreeComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cvdColors:
             />
             縦並び
           </label>
+          <label
+            className="demo-toggle"
+            title="左右整列のプレースホルダ行(グレーの空行)を Ctrl+C / CSV の出力から除く"
+          >
+            <input
+              type="checkbox"
+              checked={excludePlaceholderCopy}
+              disabled={!alignRows}
+              onChange={(event) => setExcludePlaceholderCopy(event.target.checked)}
+            />
+            空行を除いてコピー
+          </label>
           <label className="demo-toggle">
             <input
               type="checkbox"
@@ -479,6 +493,7 @@ function TreeComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cvdColors:
           diffLabelColumn={{ title: '変更箇所', width: 130 }}
           layout={verticalLayout ? 'vertical' : 'horizontal'}
           enableScrollSync={syncScroll}
+          excludePlaceholderRowsOnCopy={excludePlaceholderCopy}
           leftHeader={<PaneHeader info={toRootItemInfo(leftRows)} />}
           rightHeader={<PaneHeader info={toRootItemInfo(rightRows)} />}
           gridProps={gridProps}

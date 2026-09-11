@@ -138,6 +138,7 @@ export type {
   ComparisonHighlightOptions,
   DiffLabelColumnOptions,
   ComparisonDiffLabelColumnProps,
+  ComparisonCopyOptions,
   UseComparisonPaneOptions,
   ComparisonPaneGridProps,
   UseComparisonPaneResult,

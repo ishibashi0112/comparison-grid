@@ -78,6 +78,7 @@ export function MultiComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cv
   const [alignRows, setAlignRows] = useState(false);
   const [syncScroll, setSyncScroll] = useState(true);
   const [verticalLayout, setVerticalLayout] = useState(false);
+  const [excludePlaceholderCopy, setExcludePlaceholderCopy] = useState(false);
 
   // 1. 構成の配列: { id, rows, label }。id は位置で固定し(同じ品番を 2 回並べても衝突しない)、label に品番を出す。
   const sides = useMemo<ComparisonSideInput<BomRow>[]>(
@@ -263,6 +264,18 @@ export function MultiComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cv
             />
             縦並び
           </label>
+          <label
+            className="demo-toggle"
+            title="整列のプレースホルダ行(グレーの空行)を Ctrl+C / CSV の出力から除く"
+          >
+            <input
+              type="checkbox"
+              checked={excludePlaceholderCopy}
+              disabled={!alignRows}
+              onChange={(event) => setExcludePlaceholderCopy(event.target.checked)}
+            />
+            空行を除いてコピー
+          </label>
           <button
             type="button"
             className="demo-button"
@@ -307,6 +320,7 @@ export function MultiComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cv
           diffLabelColumn={{ title: '変更箇所', width: 170 }}
           layout={verticalLayout ? 'vertical' : 'horizontal'}
           scrollSyncGroup={group}
+          excludePlaceholderRowsOnCopy={excludePlaceholderCopy}
           gridProps={gridProps}
           className={cvdColors ? 'cmpg-colors-cvd' : undefined}
         >
