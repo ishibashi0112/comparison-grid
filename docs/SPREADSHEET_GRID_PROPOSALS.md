@@ -48,7 +48,7 @@ spreadsheet-grid **v0.29.0**(コミット「proposals batch 1〜6」・2026-08-2
 | 10 | ✅ 採用(batch 8・**v0.33.0**・2026-09-11) | `hoveredRowIndex?: number \| null`(optionally controlled)/ `onHoveredRowChange?: (viewRowIndex, { source: 'pointer' })`(同値抑止・`enableRowHover: false` では無効・`GridState` / ハンドルには載せない)。提案どおりの形 |
 | 11 | ✅ 採用(batch 9・**v0.33.0**・2026-09-11) | `isRowExportable?: (row, { viewRowIndex, rowKey }) => boolean`。コピー(全選択 / セル範囲 / 行選択 / 列選択)/ `exportCsv` / `getExportData` の 3 経路共通、行単位、貼り付けと全選択判定には影響なし(scope `'raw'` のみ `viewRowIndex` がソース index) |
 
-採用時の comparison-grid 側の対応: peer 範囲を `>=0.33.0 <1.0.0` へ更新し、#11 は batch 31 で `excludePlaceholderRowsOnCopy`(`useComparisonPane` が `isRowExportable` を合成)を接続。回り道は入れていなかったため、外すものはない。
+採用時の comparison-grid 側の対応: peer 範囲を `>=0.33.0 <1.0.0` へ更新し、#11 は batch 31 で `excludePlaceholderRowsOnCopy`(`useComparisonPane` が `isRowExportable` を合成)、#10 は batch 32 で `enableHoverSync` / `useComparisonHoverSync` 系(グループの state を全ペインへ controlled 値として配る)を接続。回り道は入れていなかったため、外すものはない。
 
 ---
 

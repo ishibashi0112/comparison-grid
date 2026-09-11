@@ -26,6 +26,7 @@ description: "@ishibashi0112/comparison-grid の使い方。2 つ以上のリス
 | DOM を完全に自前にする | `useComparisonPane` + `useComparisonScrollSync`(N 構成は `useComparisonScrollSyncMany`) | `examples/06-headless-own-grid.tsx` |
 | React なしで判定だけ | `compare` / `compareMany` / `alignComparisonRows(Many)` | — |
 | CSV / Excel | `getComparisonExportData`(`excludeRows` でプレースホルダ行を除ける) | `examples/07-export-csv.tsx` |
+| 整列モードで片側のホバーを相手ペインの同じ行にも出す | `enableHoverSync`(`ComparisonView` / `ComparisonLayout.Root`)/ `useComparisonHoverSync` | — |
 | 整列モードの空行を Ctrl+C / CSV に含めない | `excludePlaceholderRowsOnCopy`(`ComparisonView` / `ComparisonLayout.Root` / `useComparisonPane`) | — |
 | 手入力ペインをマスタと比べる | `useManualRows` + `useComparison` | `examples/08-manual-input.tsx` |
 
@@ -58,7 +59,8 @@ const comparison = useComparison<Row>({
 6. 木モードは「展開済み・出現 1 回 = 1 行」のデータ前提。破綻は `buildComparisonTree(...).issues` に出るが修復されない。
 7. 3 構成以上の意味論: `mode: 'base'`(既定)は「基準から見て何が変わったか」、`mode: 'all'` は「全構成に存在し全構成で一致するときだけ同一」。ユーザーの意図がどちらか確認してから選ぶ。
 8. 色は CSS 変数 `--cmpg-*`(`.cmpg-pane` / `.cmpg-grid` に定義)で上書きする。クラス名は `CMPG_CLASS_NAMES` を参照し、文字列を直書きしない。
-9. `alignRows` のプレースホルダ行(グレーの空行)は既定で Ctrl+C / CSV に空行として含まれる。片側だけを貼る用途なら `excludePlaceholderRowsOnCopy`、左右を横に並べて貼る用途なら既定のまま(行位置が保たれる)。
+9. `enableHoverSync` は行位置で同期するので `alignRows` と組で使う(非整列では左右で別の行が光る)。`gridProps` に `enableRowHover: false` を渡すと無効。
+10. `alignRows` のプレースホルダ行(グレーの空行)は既定で Ctrl+C / CSV に空行として含まれる。片側だけを貼る用途なら `excludePlaceholderRowsOnCopy`、左右を横に並べて貼る用途なら既定のまま(行位置が保たれる)。
 
 ## 4. 差分の形(判定結果を自作 UI で使うとき)
 

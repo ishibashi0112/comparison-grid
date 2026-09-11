@@ -19,6 +19,7 @@
 | DOM を完全に自前にする(ライブラリからは grid props だけ受け取る) | `useComparisonPane` + `useComparisonScrollSync`(2 構成)/ `useComparisonScrollSyncMany`(N 構成) | [examples/06](../../../examples/06-headless-own-grid.tsx) |
 | React なしで判定だけ使う(Node / Worker / テスト) | `compare` / `alignComparisonRows` / `compareMany` / `alignComparisonRowsMany` / `buildComparisonTree` / `flattenComparisonTree` | — |
 | CSV / Excel に出す | `getComparisonExportData`(grid の `getExportData()` と同形。`excludeRows` でプレースホルダ行を除ける) | [examples/07](../../../examples/07-export-csv.tsx) |
+| 整列モードで片側の行ホバーを相手ペインの同じ行位置にも出す | `enableHoverSync`(`ComparisonView` / `ComparisonLayout.Root`)/ `useComparisonHoverSync`(headless) | — |
 | 整列モードの空行(プレースホルダ)を Ctrl+C / CSV に含めない | `excludePlaceholderRowsOnCopy`(`ComparisonView` / `ComparisonLayout.Root` / `useComparisonPane`) | — |
 | ユーザーが手入力したリストをマスタと比べる | `useManualRows` + `useComparison` | [examples/08](../../../examples/08-manual-input.tsx) |
 | 色・余白・クラスを変える | `--cmpg-*` トークン / `CMPG_CLASS_NAMES` / `.cmpg-colors-cvd` / `style.layer.css` | [README「Styles」](../../../README.md#styles) |
@@ -29,7 +30,7 @@
 ```
 ComparisonView(2 ペインのプリセット)
   └ ComparisonLayout.Root / .Pane / .Header / .Grid(合成コンポーネント。配置と数は JSX で決める)
-      └ useComparisonPane / useSyncedGridProps / useComparisonScrollSyncGroup(ヘッドレス。grid props を返す)
+      └ useComparisonPane / useSyncedGridProps / useComparisonScrollSyncGroup / useHoverSyncedGridProps(ヘッドレス。grid props を返す)
           └ compare / compareMany / alignComparisonRows(Many) / buildComparisonTree(純ロジック。React 非依存)
 ```
 
@@ -46,7 +47,7 @@ ComparisonView(2 ペインのプリセット)
 - **サイドカー方式**: 行 `T` には書き込まず、差分は `ReadonlyMap<T, ComparisonRowDiff<T>>` で行オブジェクトに紐づけます。グリッドへ渡すのは `T[]` そのものなので、`GridColumn<T>` / `SpreadsheetGridProps<T>` を `T` の型のまま書けます。
 - **判定と見た目の分離**: 判定(kind / fieldDiffs / label)は純ロジック `compare()`、見た目はクラス(`.cmpg-*`)と CSS トークン(`--cmpg-*`)で差し替えます。
 - **差分のみ表示は導出**: `effectiveShowDiffOnly = hasBothSides && showDiffOnly` を render 中に導出し、片側だけのデータでは自動的に無効になります(useEffect での state 同期はしません)。
-- **ヘッドレス層 → 合成コンポーネント → プリセット**: ペインの差分合成は `useComparisonPane()`(`SpreadsheetGrid` へスプレッドできる `gridProps` を返す)、スクロール同期は `useComparisonScrollSyncGroup()` / `useSyncedGridProps()` がフックとして本体を持ちます。その上に合成コンポーネント `ComparisonLayout.Root / .Pane / .Header / .Grid`(Root が Context で配り、子は役割を名乗るだけ。ペイン数は JSX の子の数)があり、`ComparisonView` はそれで組んだ 2 ペインのプリセット、`ComparisonPane` はフックにラッパー DOM を足した便利品です。DOM や配置を自分で決めたいときは一段ずつ降りられます。
+- **ヘッドレス層 → 合成コンポーネント → プリセット**: ペインの差分合成は `useComparisonPane()`(`SpreadsheetGrid` へスプレッドできる `gridProps` を返す)、スクロール同期は `useComparisonScrollSyncGroup()` / `useSyncedGridProps()`、ホバー同期は `useComparisonHoverSyncGroup()` / `useHoverSyncedGridProps()` がフックとして本体を持ちます。その上に合成コンポーネント `ComparisonLayout.Root / .Pane / .Header / .Grid`(Root が Context で配り、子は役割を名乗るだけ。ペイン数は JSX の子の数)があり、`ComparisonView` はそれで組んだ 2 ペインのプリセット、`ComparisonPane` はフックにラッパー DOM を足した便利品です。DOM や配置を自分で決めたいときは一段ずつ降りられます。
 - **N 構成(3・4 構成)**: 基準対各構成の意味論で、`compareMany()` → `useMultiComparison()` → `ComparisonLayout` の順に載っています。2-way の API は変更していません。
 
 ## 純ロジック(React 非依存)
@@ -550,6 +551,26 @@ const navigation = useMultiComparisonNavigation({ comparison: multi, alignRows: 
 // 各構成: useComparisonPane({ rows: side.visibleRows, diffs: side.diffs, placeholderRows: side.placeholderRows, gridProps: sync.sides[side.id], ... })
 ```
 
+### ホバー同期(`useComparisonHoverSync` / `useComparisonHoverSyncGroup` / `useHoverSyncedGridProps` / `useComparisonHoverSyncMany`)
+
+左右整列モードで「片側の行をホバーしたら相手ペインの同じ行位置も光らせる」ためのヘッドレス層(`ComparisonView` / `ComparisonLayout.Root` の `enableHoverSync` の本体)。spreadsheet-grid v0.33.0 の optionally controlled な行ホバー(`hoveredRowIndex` / `onHoveredRowChange`)に乗り、グループがホバー中のビュー行 index を 1 つ React state で持って全ペインへ controlled 値として配ります。どのペインで pointer が動いても `onHoveredRowChange` → グループ更新 → 全ペイン再描画、という 1 本の流れです(ハイライトは本体の `.ssg-body-cell--row-hovered` なので追加 CSS は不要。`--cmpg-*-row-hover-bg` がそのまま効く)。
+
+| API | 説明 |
+| --- | --- |
+| `useComparisonHoverSyncGroup({ enabled? })` | `ComparisonHoverSyncGroup` = `{ enabled, hoveredRowIndex, setHoveredRowIndex }`。`hoveredRowIndex` は state なので変わるたびに参照が変わる(`enabled=false` では常に `null`)。合成コンポーネントの Root はこれを Context で配る。 |
+| `useHoverSyncedGridProps<T>(group, userProps?)` | 1 グリッドぶんの `hoveredRowIndex` / `onHoveredRowChange` を group と合成した `ComparisonGridProps<T>`。利用側の `onHoveredRowChange` は透過・合成、利用側の `hoveredRowIndex`(controlled)は `enabled` のときグループの値で上書き。`enabled=false` では入力をそのまま返す。純関数版 `composeHoverSyncedGridProps(group, userProps)` も公開。 |
+| `useComparisonHoverSync<T>({ enabled?, leftGridProps?, rightGridProps? })` | 2-way の便利版。`{ leftGridProps, rightGridProps, group }` を返す。スクロール同期の出力をそのまま入力にできる。 |
+| `useComparisonHoverSyncMany<T>({ sides, enabled? })` | `sides: Record<sideId, ComparisonGridProps<T> \| undefined>` をまとめて合成し `{ sides, group }` を返す(`sides` は `useMemo` で保持)。 |
+
+```tsx
+const sync = useComparisonScrollSync<Row>();
+const hover = useComparisonHoverSync<Row>({ leftGridProps: sync.leftGridProps, rightGridProps: sync.rightGridProps });
+const leftPane = useComparisonPane<Row>({ ..., gridProps: hover.leftGridProps });
+const rightPane = useComparisonPane<Row>({ ..., gridProps: hover.rightGridProps });
+```
+
+前提と注意: 同じ行位置 = 同じ突き合わせ相手になるのは `alignRows`(2-way / 木 / N 構成)のときだけで、非整列では行位置が対応しない(ライブラリ側では判定しないので、オプションは `alignRows` と組で有効にする)。`gridProps` に `enableRowHover: false` を渡すと本体側で無視されるため同期しても何も光らない。グリッド側のソート / フィルターは view index を変えるため、差分ジャンプと同様に併用しない。
+
 ### 合成コンポーネント `ComparisonLayout`(`ComparisonLayoutRoot` / `ComparisonLayoutPane` / `ComparisonLayoutHeader` / `ComparisonLayoutGrid`)
 
 HeroUI の `Dropdown.Trigger / .Popover` と同じ **Compound Components** の形です。Root が Context で比較結果・列・ハイライト設定・スクロール同期グループを配り、Pane / Header / Grid は役割を名乗るだけで、配置・階層・追加要素は利用側の JSX が決めます。**ペインの数は JSX の子の数**なので、2-way(`useComparison` / `useTreeComparison`)でも N 構成(`useMultiComparison`)でも同じ書き方です。名前付き export が主(tree-shaking のため)で、名前空間 `ComparisonLayout = { Root, Pane, Header, Grid }` は同じ実体の別名です。
@@ -575,6 +596,8 @@ const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows 
 | `layout` | `'horizontal' \| 'vertical'` | `'horizontal'` | 横並びは**子の数だけ等幅カラム**(`grid-auto-flow: column`)、縦並びは 1 カラムに積む。 |
 | `enableScrollSync` | `boolean` | `false` | 全ペインのスクロール同期(軸は layout に依る)。Root が `useComparisonScrollSyncGroup` を生成する。 |
 | `scrollSyncGroup` | `ComparisonScrollSyncGroup<T>` | — | 外で作ったグループを注入(`useMultiComparisonNavigation({ getHandle: group.getHandle })` と共有するとき)。渡すと `enableScrollSync` / layout の軸設定は無視され、グループ自身の設定が使われる。 |
+| `enableHoverSync` | `boolean` | `false` | 全ペインの行ホバーを同じ行位置で同期する(`alignRows` との併用が前提。上記「ホバー同期」)。Root が `useComparisonHoverSyncGroup` を生成する。 |
+| `hoverSyncGroup` | `ComparisonHoverSyncGroup` | — | 外で作ったホバー同期グループを注入(自作 UI でホバー行を読む / 動かすとき)。渡すと `enableHoverSync` は無視される。 |
 | `enableRowHighlight` / `enableKeyCellHighlight` / `enableFieldCellHighlight` / `showDiffLabelColumn` / `diffLabelColumn` / `excludePlaceholderRowsOnCopy` | | | `ComparisonView` と同じ(全ペイン共通)。 |
 | `gridProps` | `ComparisonGridProps<T>` | — | 全ペイン共通の grid props(Grid の `gridProps` が上にマージ)。 |
 | `className` / `style` / `children` | | | ルート `.cmpg-view .cmpg-view--{layout}`(`data-cmpg-layout`)。 |
@@ -583,9 +606,9 @@ const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows 
 
 **`ComparisonLayoutHeader`**(`{ className?, style?, children? }`): `.cmpg-pane-header` スロット。指定したペインにだけ描画される(両ペインの上端を揃えたい場合は利用側で両方に置く。`ComparisonView` はそうしている)。
 
-**`ComparisonLayoutGrid<T>`**(`ComparisonLayoutGridProps<T>` = `{ side?, gridProps?, className?, style? }`): `.cmpg-pane-body` + `SpreadsheetGrid`。`side` は Pane 配下では省略可、Pane 無し(自前ラッパー)では必須。本体は `useComparisonPane` + `useSyncedGridProps`(同期 OFF でもハンドルは同期グループに登録されるため、`useMultiComparisonNavigation` の `getHandle` で引ける)。Root 外・存在しない構成 ID・side 不明は日本語メッセージの例外。
+**`ComparisonLayoutGrid<T>`**(`ComparisonLayoutGridProps<T>` = `{ side?, gridProps?, className?, style? }`): `.cmpg-pane-body` + `SpreadsheetGrid`。`side` は Pane 配下では省略可、Pane 無し(自前ラッパー)では必須。本体は `useComparisonPane` + `useSyncedGridProps` + `useHoverSyncedGridProps`(同期 OFF でもハンドルは同期グループに登録されるため、`useMultiComparisonNavigation` の `getHandle` で引ける)。Root 外・存在しない構成 ID・side 不明は日本語メッセージの例外。
 
-**フック / 補助**: `useComparisonLayout<T>()`(Root が配る `ComparisonLayoutContextValue<T>` = `{ sides, getSide, columns, keyColumnKeys, compareFields, highlight, gridProps, layout, scrollSyncGroup }`。`highlight` は `enable*` / `showDiffLabelColumn` / `diffLabelColumn` / `excludePlaceholderRowsOnCopy` の束。自作のツールバー / 集計表示に)/ `useComparisonLayoutSide()`(現在の Pane の構成 ID)/ `normalizeLayoutSides(model)`(2-way / N 構成のモデルを `ComparisonLayoutSide<T>[]` に正規化する純関数)。
+**フック / 補助**: `useComparisonLayout<T>()`(Root が配る `ComparisonLayoutContextValue<T>` = `{ sides, getSide, columns, keyColumnKeys, compareFields, highlight, gridProps, layout, scrollSyncGroup, hoverSyncGroup }`。`highlight` は `enable*` / `showDiffLabelColumn` / `diffLabelColumn` / `excludePlaceholderRowsOnCopy` の束。自作のツールバー / 集計表示に)/ `useComparisonLayoutSide()`(現在の Pane の構成 ID)/ `normalizeLayoutSides(model)`(2-way / N 構成のモデルを `ComparisonLayoutSide<T>[]` に正規化する純関数)。
 
 ### `ComparisonView<T extends object>`
 
@@ -607,6 +630,7 @@ const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows 
 | `enableFieldCellHighlight` | `boolean` | `true` | `compareFields` 対応列のセル強調。 |
 | `excludePlaceholderRowsOnCopy` | `boolean` | `false` | `alignRows` のプレースホルダ行(グレーの空行)を、グリッドの**コピー**(`Ctrl/⌘+C` の TSV。左上コーナーの全選択 / 列選択 / 行選択いずれも)/ `exportCsv` / `getExportData` の出力から行ごと除く。片側だけを Excel 等へ貼るときに空行が混じらないようにする用途。左右を横に並べて貼りたい(行位置を保ちたい)ときは既定の `false` のまま。実体は spreadsheet-grid v0.33.0 の `isRowExportable` で、利用側の `gridProps.isRowExportable` とは AND で合成される。`useComparisonPane` / `ComparisonPane` / `ComparisonLayout.Root` でも同名。 |
 | `enableScrollSync` | `boolean` | `false` | 両ペインのスクロールを同期する(`alignRows` との併用を想定)。同期する軸は `layout` に依る: `'horizontal'` は**縦**(top)のみ(横は同期しない)、`'vertical'` は**縦横**(top / left)両方(縦並びでは列が上下に揃うため横も合わせる)。`source: 'user'` のスクロールだけ相手の `setScrollPosition()` へ伝え、`'api'` 由来は無視してループを防ぐ(spreadsheet-grid v0.29.0 のスクロール API)。利用側の `ref` / `onScroll`(`gridProps` / 片側 props)はそのまま透過・合成される。 |
+| `enableHoverSync` | `boolean` | `false` | 片側の行ホバーを相手ペインの同じ行位置にも表示する(`alignRows` との併用が前提。非整列では行位置が対応しない)。実体は spreadsheet-grid v0.33.0 の controlled 行ホバーで、`gridProps` の `enableRowHover: false` では無効。headless 版は `useComparisonHoverSync`。 |
 | `className` / `style` | `string` / `CSSProperties` | — | ルート(`.cmpg-view`)へ。 |
 
 `ComparisonView` は batch 22 から合成コンポーネントで組んだプリセットです(props / DOM / 振る舞いは従来どおり)。3 ペイン以上や独自配置は `ComparisonLayout` を直接使ってください。
@@ -710,6 +734,7 @@ const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows 
 - `T` はオブジェクトである必要があります(`SpreadsheetGrid<T extends object>` の要求と同じ。`compare()` 単体は任意の `T` で動きます)。
 - 左右の行の位置は既定では揃えません(ss2602 と同じ)。揃えたい場合は `alignRows: true`(左右整列モード)。プレースホルダ行は差分 Map に載らないため `getDiff()` は `undefined` を返します(`placeholders` の Set で判定してください)。
 - `alignRows` のプレースホルダ行は既定で `{} as T` です。`row.foo.bar` のような入れ子アクセスをする `getValue` / `renderCell` / `valueFormatter` がある列では `createPlaceholderRow` で安全な行を返してください。
+- `enableHoverSync` は行位置で同期するため、`alignRows` 無しでは左右で別の行が光ります。整列モードと組で使ってください。
 - `alignRows` のプレースホルダ行はグリッドから見ると通常の行なので、既定では `Ctrl/⌘+C` / `exportCsv` / `getExportData` に空行として含まれます。除きたいときは `excludePlaceholderRowsOnCopy`(グリッド側)/ `getComparisonExportData` の `excludeRows`(ライブラリ側)を使ってください。
 - グリッドの行グルーピング(`rowGroup`)を有効にした場合、グループ行には差分クラスは付きません(leaf 行のみ)。
 - 木モード(`useTreeComparison`)の `visibleLeft` / `visibleRight` は平坦化した配列で、入力と同一参照にはなりません(木の参照が同じなら安定)。渡す木は `useMemo` で組み立ててください。
@@ -723,6 +748,6 @@ const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows 
 
 ヘッドレス層(`useComparisonPane` / `useComparisonScrollSync`)は batch 18(2026-09-07)で追加。`ComparisonPane` / `ComparisonView` の振る舞いは変えず、本体をフックへ移して薄い包みにした。
 
-spreadsheet-grid v0.33.0(2026-09-11。comparison-grid からの提案 #10 / #11 を採用)に合わせ、batch 31 で `excludePlaceholderRowsOnCopy`(`isRowExportable` へのプレースホルダ判定の合成)と `getComparisonExportData` の `excludeRows` を追加。
+spreadsheet-grid v0.33.0(2026-09-11。comparison-grid からの提案 #10 / #11 を採用)に合わせ、batch 31 で `excludePlaceholderRowsOnCopy`(`isRowExportable` へのプレースホルダ判定の合成)と `getComparisonExportData` の `excludeRows`、batch 32 でホバー同期(`enableHoverSync` / `useComparisonHoverSync` 系。controlled 行ホバー `hoveredRowIndex` / `onHoveredRowChange` に乗る)を追加。
 
 N 構成比較(3・4 構成)は batch 19(2026-09-07)で純ロジック(`compareMany` / `alignComparisonRowsMany`)、batch 20 で React 接続(`useMultiComparison`)、batch 21 でスクロール同期と差分ジャンプの N 対応(`useComparisonScrollSyncGroup` / `useComparisonScrollSyncMany` / `useMultiComparisonNavigation`)、batch 22 で合成コンポーネント(`ComparisonLayout.Root / .Pane / .Header / .Grid`。`ComparisonView` はそのプリセットに)を追加。batch 24(2026-09-09)で全構成一致判定 `mode: 'all'` を追加。木モードの N 化は後続(`docs/DESIGN_NOTES.md` 6 章)。

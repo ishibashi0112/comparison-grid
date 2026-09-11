@@ -14,7 +14,7 @@ import {
 
 /**
  * 2 ペインのプリセット(`ComparisonLayout` で組んだもの)。`useComparison` / `useTreeComparison` の戻り値と
- * 列定義を渡すだけで、差分ハイライト / 差分ラベル列 / スクロール同期つきの左右比較になります。
+ * 列定義を渡すだけで、差分ハイライト / 差分ラベル列 / スクロール同期 / ホバー同期つきの左右比較になります。
  *
  * @example
  * ```tsx
@@ -47,6 +47,7 @@ export function ComparisonView<T extends object>(props: ComparisonViewProps<T>) 
     enableKeyCellHighlight,
     enableFieldCellHighlight,
     enableScrollSync = false,
+    enableHoverSync = false,
     showDiffLabelColumn,
     diffLabelColumn,
     excludePlaceholderRowsOnCopy,
@@ -60,6 +61,7 @@ export function ComparisonView<T extends object>(props: ComparisonViewProps<T>) 
       keyColumnKeys={keyColumnKeys}
       layout={layout}
       enableScrollSync={enableScrollSync}
+      enableHoverSync={enableHoverSync}
       gridProps={gridProps}
       className={className}
       style={style}

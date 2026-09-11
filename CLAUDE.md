@@ -61,6 +61,7 @@ src/components/comparison-grid/
   hooks/useManualRows.ts  マニュアル入力(末尾空行維持 / 正規化 / 送信時検証)
   hooks/useComparisonPane.ts ヘッドレス層: ペインの差分合成(SpreadsheetGrid へスプレッドできる gridProps を返す。ComparisonPane の本体)
   hooks/useComparisonScrollSync.ts ヘッドレス層: スクロール同期。useComparisonScrollSyncGroup(ハンドル登録 + broadcast)/ useSyncedGridProps / useComparisonScrollSyncMany(N 構成)/ useComparisonScrollSync(2-way 便利版)
+  hooks/useComparisonHoverSync.ts ヘッドレス層: ホバー同期(整列モード)。useComparisonHoverSyncGroup(ホバー行 index の共有 state)/ useHoverSyncedGridProps(spreadsheet-grid 0.33.0 の hoveredRowIndex / onHoveredRowChange を合成)/ useComparisonHoverSyncMany / useComparisonHoverSync(2-way 便利版)
   view/ComparisonPane.tsx 片側 1 ペイン(useComparisonPane + ラッパー DOM の薄い包み)
   view/ComparisonLayout.tsx 合成コンポーネント Root / Pane / Header / Grid(Root が Context で配る。ペイン数は JSX の子の数)
   view/comparisonLayoutContext.ts 合成コンポーネントの Context / useComparisonLayout / モデル正規化(react-refresh のためコンポーネントと分離)

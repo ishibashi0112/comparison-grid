@@ -47,6 +47,13 @@ export {
   useSyncedGridProps,
   composeSyncedGridProps,
 } from './hooks/useComparisonScrollSync';
+export {
+  useComparisonHoverSync,
+  useComparisonHoverSyncGroup,
+  useComparisonHoverSyncMany,
+  useHoverSyncedGridProps,
+  composeHoverSyncedGridProps,
+} from './hooks/useComparisonHoverSync';
 export { ComparisonPane } from './view/ComparisonPane';
 export { ComparisonView } from './view/ComparisonView';
 // 合成コンポーネント: Root が Context で配り、Pane / Header / Grid は役割だけ。ペイン数は JSX の子の数。
@@ -145,6 +152,12 @@ export type {
   ComparisonPaneProps,
   UseComparisonScrollSyncOptions,
   UseComparisonScrollSyncResult,
+  ComparisonHoverSyncGroup,
+  UseComparisonHoverSyncGroupOptions,
+  UseComparisonHoverSyncOptions,
+  UseComparisonHoverSyncResult,
+  UseComparisonHoverSyncManyOptions,
+  UseComparisonHoverSyncManyResult,
   ComparisonViewModel,
   ComparisonViewLayout,
   ComparisonViewProps,

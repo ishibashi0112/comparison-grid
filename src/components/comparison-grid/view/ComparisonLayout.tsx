@@ -1,8 +1,8 @@
 // 合成コンポーネント(Compound Components)です。HeroUI の Dropdown.Trigger / .Popover のように、
-//   Root が Context で状態(比較結果 / 列 / ハイライト設定 / スクロール同期グループ)を配り、
+//   Root が Context で状態(比較結果 / 列 / ハイライト設定 / スクロール同期・ホバー同期グループ)を配り、
 //   Pane / Header / Grid は「役割」を名乗るだけで、配置・階層・追加要素は利用側の JSX が決めます。
 //   - ペインの数は JSX の子の数。2-way(useComparison)でも N 構成(useMultiComparison)でも同じ書き方。
-//   - Grid の本体はヘッドレス層(useComparisonPane + useSyncedGridProps)。DOM は .cmpg-pane-body だけ。
+//   - Grid の本体はヘッドレス層(useComparisonPane + useSyncedGridProps + useHoverSyncedGridProps)。DOM は .cmpg-pane-body だけ。
 //   - ComparisonView はこれらで組んだプリセット(props / DOM は従来どおり)。
 //   - Root 外で Pane / Grid を使うと例外(日本語メッセージ)。明示的に props を渡すヘッドレス経路は残る。
 import { useMemo } from 'react';
@@ -31,14 +31,18 @@ import {
   useComparisonScrollSyncGroup,
   useSyncedGridProps,
 } from '../hooks/useComparisonScrollSync';
+import {
+  useComparisonHoverSyncGroup,
+  useHoverSyncedGridProps,
+} from '../hooks/useComparisonHoverSync';
 import { cx } from '../logic/cx';
 import '../styles.css';
 
 const CLASS_SAFE_ID = /^[A-Za-z0-9_-]+$/;
 
 /**
- * 合成コンポーネントの Root。比較結果(2-way / N 構成)・列・ハイライト設定・スクロール同期グループを Context で
- * 配ります。子に置いた `ComparisonLayout.Pane` の数だけペインが並びます(横並びは等幅カラム)。
+ * 合成コンポーネントの Root。比較結果(2-way / N 構成)・列・ハイライト設定・スクロール同期 / ホバー同期グループを
+ * Context で配ります。子に置いた `ComparisonLayout.Pane` の数だけペインが並びます(横並びは等幅カラム)。
  *
  * @example
  * ```tsx
@@ -60,6 +64,8 @@ export function ComparisonLayoutRoot<T extends object>(props: ComparisonLayoutRo
     layout = 'horizontal',
     enableScrollSync = false,
     scrollSyncGroup,
+    enableHoverSync = false,
+    hoverSyncGroup,
     gridProps,
     className,
     style,
@@ -100,6 +106,8 @@ export function ComparisonLayoutRoot<T extends object>(props: ComparisonLayoutRo
     syncHorizontal: layout === 'vertical',
   });
   const group = scrollSyncGroup ?? ownGroup;
+  const ownHoverGroup = useComparisonHoverSyncGroup({ enabled: enableHoverSync });
+  const hoverGroup = hoverSyncGroup ?? ownHoverGroup;
 
   const highlight = useMemo(
     () => ({
@@ -131,8 +139,9 @@ export function ComparisonLayoutRoot<T extends object>(props: ComparisonLayoutRo
       gridProps,
       layout,
       scrollSyncGroup: group,
+      hoverSyncGroup: hoverGroup,
     }),
-    [sides, sidesById, columns, keyColumnKeys, compareFields, highlight, gridProps, layout, group],
+    [sides, sidesById, columns, keyColumnKeys, compareFields, highlight, gridProps, layout, group, hoverGroup],
   );
 
   return (
@@ -179,7 +188,7 @@ export function ComparisonLayoutHeader(props: ComparisonLayoutHeaderProps) {
   );
 }
 
-/** ペインのグリッド(`.cmpg-pane-body` + `SpreadsheetGrid`)。Pane 配下では `side` 省略可。本体は `useComparisonPane` + `useSyncedGridProps`。 */
+/** ペインのグリッド(`.cmpg-pane-body` + `SpreadsheetGrid`)。Pane 配下では `side` 省略可。本体は `useComparisonPane` + `useSyncedGridProps` + `useHoverSyncedGridProps`。 */
 export function ComparisonLayoutGrid<T extends object>(props: ComparisonLayoutGridProps<T>) {
   const { side: sideProp, gridProps, className, style } = props;
   const layout = useComparisonLayout<T>();
@@ -193,6 +202,7 @@ export function ComparisonLayoutGrid<T extends object>(props: ComparisonLayoutGr
   );
   // フックの呼び出し順を保つため、side が無い場合も合成は行い、描画の直前で例外にする。
   const synced = useSyncedGridProps(layout.scrollSyncGroup, sideId ?? '', merged);
+  const hoverSynced = useHoverSyncedGridProps(layout.hoverSyncGroup, synced);
   const pane = useComparisonPane<T>({
     rows: side?.rows ?? EMPTY_ROWS,
     diffs: side?.diffs ?? EMPTY_DIFFS,
@@ -202,7 +212,7 @@ export function ComparisonLayoutGrid<T extends object>(props: ComparisonLayoutGr
     placeholderRows: side?.placeholderRows,
     contextRows: side?.contextRows,
     descendantDiffCounts: side?.descendantDiffCounts,
-    gridProps: synced,
+    gridProps: hoverSynced,
     ...layout.highlight,
   });
 

@@ -411,6 +411,47 @@ export type UseComparisonScrollSyncResult<T> = {
   rightGridProps: ComparisonGridProps<T>;
 };
 
+/** ホバー中のビュー行 index を全ペインで共有するオブジェクト(useComparisonHoverSyncGroup)。
+ *  spreadsheet-grid v0.33.0 の controlled 行ホバー(hoveredRowIndex / onHoveredRowChange)に乗る。
+ *  合成コンポーネントの Root が Context で配るものと同じ。hoveredRowIndex が変わるたびに参照が変わる(state)。 */
+export type ComparisonHoverSyncGroup = {
+  enabled: boolean;
+  /** 全ペインへ controlled 値として配るビュー行 index(null = ホバーなし)。enabled=false では常に null。 */
+  hoveredRowIndex: number | null;
+  /** どのペインからでも呼べる更新(同値なら再描画しない)。 */
+  setHoveredRowIndex: (viewRowIndex: number | null) => void;
+};
+
+export type UseComparisonHoverSyncGroupOptions = {
+  /** 同期の有効 / 無効(既定 true)。false では controlled 値を配らず、各グリッドは単独でホバーする。 */
+  enabled?: boolean;
+};
+
+/** useComparisonHoverSync のオプション(2-way)。 */
+export type UseComparisonHoverSyncOptions<T> = UseComparisonHoverSyncGroupOptions & {
+  /** 合成元の grid props(利用側の onHoveredRowChange は透過・合成される。利用側の hoveredRowIndex は
+   *  enabled のときグループの値で上書きされる)。 */
+  leftGridProps?: ComparisonGridProps<T>;
+  rightGridProps?: ComparisonGridProps<T>;
+};
+
+export type UseComparisonHoverSyncResult<T> = {
+  leftGridProps: ComparisonGridProps<T>;
+  rightGridProps: ComparisonGridProps<T>;
+  group: ComparisonHoverSyncGroup;
+};
+
+/** useComparisonHoverSyncMany のオプション。構成 ID → 合成元 grid props。 */
+export type UseComparisonHoverSyncManyOptions<T> = UseComparisonHoverSyncGroupOptions & {
+  /** 構成 ID → 合成元の grid props。参照が変わると全構成の props が作り直されるため useMemo で保持すること。 */
+  sides: Readonly<Record<ComparisonSideId, ComparisonGridProps<T> | undefined>>;
+};
+
+export type UseComparisonHoverSyncManyResult<T> = {
+  sides: Readonly<Record<ComparisonSideId, ComparisonGridProps<T>>>;
+  group: ComparisonHoverSyncGroup;
+};
+
 /** ComparisonView が useComparison / useTreeComparison の結果から使う部分。
  *  placeholders は alignRows 利用時、contextRows は木モードの「差分のみ」利用時のみ必要。 */
 export type ComparisonViewModel<T> = Pick<
@@ -437,6 +478,10 @@ export type ComparisonViewProps<T extends object> = ComparisonHighlightOptions &
      *  (縦並びでは列が上下に揃うため横も合わせる)。source が 'user' のスクロールだけを相手ペインへ
      *  伝え、'api' 由来は無視してループを防ぎます。 */
     enableScrollSync?: boolean;
+    /** 片側の行ホバーを相手ペインの同じ行位置にも表示する(既定 false)。alignRows(同じ行位置 = 同じ突き合わせ相手)
+     *  との併用が前提で、非整列では行位置が対応しない。spreadsheet-grid v0.33.0 の controlled 行ホバーに乗るため、
+     *  `enableRowHover: false` を gridProps に渡すと無効。 */
+    enableHoverSync?: boolean;
     leftHeader?: ReactNode;
     rightHeader?: ReactNode;
     /** 両ペイン共通の grid props。 */
@@ -876,6 +921,10 @@ export type ComparisonLayoutRootProps<T extends object> = ComparisonHighlightOpt
     /** 同期グループを外から渡す(useMultiComparisonNavigation の getHandle と共有するとき等)。
      *  渡した場合 enableScrollSync / layout による軸設定は無視され、グループ自身の設定が使われる。 */
     scrollSyncGroup?: ComparisonScrollSyncGroup<T>;
+    /** 全ペインの行ホバーを同じ行位置で同期する(既定 false)。alignRows との併用が前提。 */
+    enableHoverSync?: boolean;
+    /** ホバー同期グループを外から渡す(自作 UI とホバー行を共有するとき等)。渡した場合 enableHoverSync は無視される。 */
+    hoverSyncGroup?: ComparisonHoverSyncGroup;
     /** 全ペイン共通の grid props(Grid の gridProps が上にマージされる)。 */
     gridProps?: ComparisonGridProps<T>;
     className?: string;
@@ -920,4 +969,5 @@ export type ComparisonLayoutContextValue<T> = {
   gridProps?: ComparisonGridProps<T>;
   layout: ComparisonViewLayout;
   scrollSyncGroup: ComparisonScrollSyncGroup<T>;
+  hoverSyncGroup: ComparisonHoverSyncGroup;
 };

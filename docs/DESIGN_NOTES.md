@@ -46,7 +46,7 @@
 7. **`title: ''` の列ヘッダーが `key` にフォールバックする。** ボタン専用列(ss2602 の `__detail`)で空タイトルにすると `__detail` が見出しに出る。空文字は「見出しなし」として扱うか、API_REFERENCE に明記すると親切(デモでは `title: 'マスタ'` で回避)。
 8. **スクロール同期 API(Phase 2 向け)。** 左右整列モードでは 2 グリッドの縦スクロールを同期したい。ハンドルに `getScrollPosition()` / `setScrollPosition({ top, left })`、props に `onScroll` があると実装できる(現状は `scrollToRow` / `scrollToCell` のみ)。
 9. **pointerdown 時の `focus()` に `preventScroll: true`(2026-08-30・v0.29.0 で確認)。** グリッド root(`.ssg-shell`)が viewport に収まりきっていない状態でセルを 1 回クリックすると、`focus()` の既定動作でページがスクロールし、ポインタ直下に来たセルへの `pointerenter` が `selection` ドラッグ中の `updateSelection` を呼んで**単クリックが数行の範囲選択になる**(Playwright + Chrome で再現: viewport 900px / root 下端 934px → スクロール 33px・選択 2 行)。`useGridPointerInteractions.ts` の pointerdown 3 箇所を `focus({ preventScroll: true })` にすれば解消(capture 段階の先行フォーカスで検証済み)。詳細は `docs/SPREADSHEET_GRID_PROPOSALS.md` #9。**v0.29.1(2026-08-30)で採用済み**: peer 範囲を `>=0.29.1 <1.0.0` へ更新し、実ブラウザで解消を確認(暫定回避は入れていない)。
-10. **行ホバーの controlled 化 `hoveredRowIndex` / `onHoveredRowChange`(2026-09-11 追記・v0.32.0)。** 左右整列モードで「片側をホバーしたら相手ペインの同じ行位置も光らせる」オプション(ホバー同期)を作りたいが、行ホバーは内部 `useState` のみで読む / 書く手段がない。利用側だけでやるなら `data-row-index` の DOM 依存 + `getRowClassName` 経由の再レンダー増になるため、controlled prop 対を提案。採用後は `useComparisonHoverSync` + `enableHoverSync`(既定 false)で接続する。詳細は `docs/SPREADSHEET_GRID_PROPOSALS.md` #10。**v0.33.0(2026-09-11)で採用済み**(`hoveredRowIndex` / `onHoveredRowChange`。提案どおりの形)。
+10. **行ホバーの controlled 化 `hoveredRowIndex` / `onHoveredRowChange`(2026-09-11 追記・v0.32.0)。** 左右整列モードで「片側をホバーしたら相手ペインの同じ行位置も光らせる」オプション(ホバー同期)を作りたいが、行ホバーは内部 `useState` のみで読む / 書く手段がない。利用側だけでやるなら `data-row-index` の DOM 依存 + `getRowClassName` 経由の再レンダー増になるため、controlled prop 対を提案。採用後は `useComparisonHoverSync` + `enableHoverSync`(既定 false)で接続する。詳細は `docs/SPREADSHEET_GRID_PROPOSALS.md` #10。**v0.33.0(2026-09-11)で採用済み**(`hoveredRowIndex` / `onHoveredRowChange`。提案どおりの形)。batch 32 で `enableHoverSync` / `useComparisonHoverSync` 系を接続。
 11. **コピー / CSV / getExportData の行フィルタ `isRowExportable(row, ctx)`(2026-09-11 追記・v0.32.0)。** 整列モードのプレースホルダ行が全選択 / 列選択 / 行選択の Ctrl+C で空行として混じる。「プレースホルダ行を除いてコピー」オプション(既定 false)を作りたいが、行を除外するフックがなく、利用側で Ctrl+C を横取りするとコピー整形の二重実装になる。行述語 1 つを 3 経路共通で適用する形を提案。採用後は `useComparisonPane` が `isRowExportable: (row) => !placeholderRows.has(row)` を流す(`excludePlaceholderRowsOnCopy`)。詳細は同 #11。**v0.33.0(2026-09-11)で採用済み**(`isRowExportable(row, { viewRowIndex, rowKey })`。コピー / exportCsv / getExportData の 3 経路共通、行単位、貼り付けと全選択判定には影響なし)。peer 下限を `>=0.33.0 <1.0.0` へ更新し、batch 31 で `excludePlaceholderRowsOnCopy` を接続。
 
 ## 5. Phase 2 候補と実装記録
@@ -213,6 +213,15 @@
 - `getComparisonExportData` に `excludeRows?: ReadonlySet<T>`(同一性で行ごと除く)。ライブラリ側エクスポートとグリッド側コピーで同じ結果にできる。
 - 既定 OFF にした理由: 片側だけを貼る用途では空行が邪魔だが、左右を横に並べて貼る用途では空行があるほうが行位置が保たれる(用途で割れる)。
 - 型 `ComparisonCopyOptions` を公開。デモ(2 構成 / N 構成)に「空行を除いてコピー」トグル(整列 OFF では無効)。
+
+### 実装済み(2026-09-11・batch 32。ホバー同期 `enableHoverSync` / `useComparisonHoverSync`)
+
+- spreadsheet-grid v0.33.0(提案 #10 `hoveredRowIndex` / `onHoveredRowChange` 採用)に乗る。グループ(`useComparisonHoverSyncGroup`)がホバー中のビュー行 index を **React state 1 つ**で持ち、全ペインへ controlled 値として配る。どのペインの pointer でも `onHoveredRowChange` → グループ更新 → 全ペイン再描画の 1 本道。ハイライトは本体の `.ssg-body-cell--row-hovered` なので追加 CSS 無し(既存の `--cmpg-*-row-hover-bg` がそのまま効く)。
+- スクロール同期と同じ 4 段構成: `useComparisonHoverSyncGroup` / `useHoverSyncedGridProps`(+ 純関数 `composeHoverSyncedGridProps`)/ `useComparisonHoverSyncMany` / `useComparisonHoverSync`(2-way)。`enabled=false` では入力をそのまま返す(props を足さない)。
+- `ComparisonLayout.Root` に `enableHoverSync`(既定 false)/ `hoverSyncGroup`(注入)、Context に `hoverSyncGroup`。Grid は `useSyncedGridProps` → `useHoverSyncedGridProps` → `useComparisonPane` の順に合成。`ComparisonView` に `enableHoverSync`。
+- 判断: 「整列モードでのみ意味がある」判定はライブラリ側で行わない(alignRows でも placeholders が空のことはあるし、木の整列も同じ行位置になる)。オプションを `alignRows` と組で有効にするのは利用側の責務として文書化(デモは整列 OFF でトグルを無効化)。
+- 判断: スクロール同期のグループ(ref ベース、再描画なし)とは別オブジェクトにした。ホバーは state で全ペインを再描画させる必要があり、性質が違うため。
+- テスト 8 件(フック 5 / 結合 3: 左→右に同じ行位置で付く・離れると両方消える・既定は片側だけ・`enableRowHover: false` では光らない)。デモ(2 構成 / N 構成)に「ホバー同期」トグル。
 
 ## 6. 検討中(2026-09-09。batch 19〜28 で 6-3 の 1〜5 + (B) + ドキュメント整備を実装済み — 残りは 6 の木モード N 化)
 

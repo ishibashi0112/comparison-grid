@@ -77,6 +77,7 @@ export function MultiComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cv
   const [showDiffOnly, setShowDiffOnly] = useState(false);
   const [alignRows, setAlignRows] = useState(false);
   const [syncScroll, setSyncScroll] = useState(true);
+  const [syncHover, setSyncHover] = useState(false);
   const [verticalLayout, setVerticalLayout] = useState(false);
   const [excludePlaceholderCopy, setExcludePlaceholderCopy] = useState(false);
 
@@ -256,6 +257,15 @@ export function MultiComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cv
             />
             スクロール同期
           </label>
+          <label className="demo-toggle" title="ある構成の行ホバーを他の構成の同じ行位置にも表示(整列時)">
+            <input
+              type="checkbox"
+              checked={syncHover}
+              disabled={!alignRows}
+              onChange={(event) => setSyncHover(event.target.checked)}
+            />
+            ホバー同期
+          </label>
           <label className="demo-toggle">
             <input
               type="checkbox"
@@ -320,6 +330,7 @@ export function MultiComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cv
           diffLabelColumn={{ title: '変更箇所', width: 170 }}
           layout={verticalLayout ? 'vertical' : 'horizontal'}
           scrollSyncGroup={group}
+          enableHoverSync={alignRows && syncHover}
           excludePlaceholderRowsOnCopy={excludePlaceholderCopy}
           gridProps={gridProps}
           className={cvdColors ? 'cmpg-colors-cvd' : undefined}
