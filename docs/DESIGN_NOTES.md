@@ -46,6 +46,8 @@
 7. **`title: ''` の列ヘッダーが `key` にフォールバックする。** ボタン専用列(ss2602 の `__detail`)で空タイトルにすると `__detail` が見出しに出る。空文字は「見出しなし」として扱うか、API_REFERENCE に明記すると親切(デモでは `title: 'マスタ'` で回避)。
 8. **スクロール同期 API(Phase 2 向け)。** 左右整列モードでは 2 グリッドの縦スクロールを同期したい。ハンドルに `getScrollPosition()` / `setScrollPosition({ top, left })`、props に `onScroll` があると実装できる(現状は `scrollToRow` / `scrollToCell` のみ)。
 9. **pointerdown 時の `focus()` に `preventScroll: true`(2026-08-30・v0.29.0 で確認)。** グリッド root(`.ssg-shell`)が viewport に収まりきっていない状態でセルを 1 回クリックすると、`focus()` の既定動作でページがスクロールし、ポインタ直下に来たセルへの `pointerenter` が `selection` ドラッグ中の `updateSelection` を呼んで**単クリックが数行の範囲選択になる**(Playwright + Chrome で再現: viewport 900px / root 下端 934px → スクロール 33px・選択 2 行)。`useGridPointerInteractions.ts` の pointerdown 3 箇所を `focus({ preventScroll: true })` にすれば解消(capture 段階の先行フォーカスで検証済み)。詳細は `docs/SPREADSHEET_GRID_PROPOSALS.md` #9。**v0.29.1(2026-08-30)で採用済み**: peer 範囲を `>=0.29.1 <1.0.0` へ更新し、実ブラウザで解消を確認(暫定回避は入れていない)。
+10. **行ホバーの controlled 化 `hoveredRowIndex` / `onHoveredRowChange`(2026-09-11 追記・v0.32.0)。** 左右整列モードで「片側をホバーしたら相手ペインの同じ行位置も光らせる」オプション(ホバー同期)を作りたいが、行ホバーは内部 `useState` のみで読む / 書く手段がない。利用側だけでやるなら `data-row-index` の DOM 依存 + `getRowClassName` 経由の再レンダー増になるため、controlled prop 対を提案。採用後は `useComparisonHoverSync` + `enableHoverSync`(既定 false)で接続する。詳細は `docs/SPREADSHEET_GRID_PROPOSALS.md` #10。
+11. **コピー / CSV / getExportData の行フィルタ `isRowExportable(row, ctx)`(2026-09-11 追記・v0.32.0)。** 整列モードのプレースホルダ行が全選択 / 列選択 / 行選択の Ctrl+C で空行として混じる。「プレースホルダ行を除いてコピー」オプション(既定 false)を作りたいが、行を除外するフックがなく、利用側で Ctrl+C を横取りするとコピー整形の二重実装になる。行述語 1 つを 3 経路共通で適用する形を提案。採用後は `useComparisonPane` が `isRowExportable: (row) => !placeholderRows.has(row)` を流す(`excludePlaceholderRowsOnCopy`)。詳細は同 #11。
 
 ## 5. Phase 2 候補と実装記録
 

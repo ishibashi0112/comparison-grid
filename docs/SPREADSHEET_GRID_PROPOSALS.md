@@ -1,7 +1,7 @@
 # spreadsheet-grid への提案書(comparison-grid 開発からのフィードバック)
 
 - 提出元: `@ishibashi0112/comparison-grid`(リポジトリ `ishibashi0112/comparison-grid`)の初版開発(2026-08-29)
-- 対象: `@ishibashi0112/spreadsheet-grid` **v0.28.1**(リポジトリ `ishibashi0112/datasheet-grid`)
+- 対象: `@ishibashi0112/spreadsheet-grid` **v0.28.1**(リポジトリ `ishibashi0112/datasheet-grid`)。#10・#11(2026-09-11 追記)は **v0.32.0** で確認
 - 位置づけ: comparison-grid は spreadsheet-grid を表示コアに使う派生ライブラリで、本体には手を入れない方針です。開発中に「あると楽 / 型が緩い / API が足りない」と感じた点を、**そのまま実装検討に入れる粒度**でまとめました。採否は spreadsheet-grid 側の判断に委ねます。
 - 読み方: 各項目は「背景 → 現状 → 提案 → 影響範囲 / 後方互換 → 採用時の comparison-grid 側の対応」の順。優先度は comparison-grid 視点(高 = 今すぐ効く / 中 = 品質向上 / 低 = Phase 2 で必要)。
 
@@ -18,6 +18,8 @@
 | 7 | `title: ''` の列見出しが `key` にフォールバックする挙動 | 仕様明確化 / 小修正 | 低 | 挙動変更(要判断) |
 | 8 | スクロール位置の取得 / 設定 / 通知 API | 機能追加 | 低(Phase 2 で必要) | 追加のみ |
 | 9 | pointerdown 時の `focus()` に `preventScroll: true`(ページスクロールで単クリックが範囲選択になる) | 不具合修正 | 高 | なし(挙動修正) |
+| 10 | 行ホバーの controlled 化(`hoveredRowIndex` / `onHoveredRowChange`)。左右整列モードのホバー同期に必要 | 機能追加 | 中(comparison-grid のオプション機能) | 追加のみ |
+| 11 | コピー / CSV / getExportData の行フィルタ `isRowExportable`。プレースホルダ行を除いたコピーに必要 | 機能追加 | 中(comparison-grid のオプション機能) | 追加のみ |
 
 ## 採用結果(2026-08-29 追記)
 
@@ -38,6 +40,8 @@ spreadsheet-grid **v0.29.0**(コミット「proposals batch 1〜6」・2026-08-2
 採用時の comparison-grid 側の対応は同日反映済み: #1 `GridCellStyleContext<T>` を `CellStyleContext<T>` の別名に変更、#2 `ComparisonPane` の `rows as T[]` キャスト削除、#3 `ComparisonView.test.tsx` の自前スタブを `installJsdomLayoutStubs()` へ置換、peer 範囲を `>=0.29.0 <1.0.0` へ更新。#8 により Phase 2「左右整列モード」のスクロール同期が実装可能になった。
 
 #9 は v0.29.1 公開後に comparison-grid 側で peer 範囲を `>=0.29.1 <1.0.0` へ更新し、同じ Playwright スクリプト(viewport 900px / root 下端 934px でセルを 1 クリック)で **スクロール 0 / 選択 1 行** を確認済み(修正前は 33px / 2 行)。comparison-grid 側の暫定回避は入れていなかったため、外すものはない。
+
+#10・#11 は 2026-09-11 に追記した未提出分(対象 v0.32.0)。採用されるまで comparison-grid 側には回り道(各項目の「利用側だけで実現する場合の回り道」)を入れない方針(二重実装 / 内部 DOM 依存を避けるため)。
 
 ---
 
@@ -247,6 +251,65 @@ onScroll?: (position: { top: number; left: number; source: 'user' | 'api' }) => 
 **影響範囲 / 互換**: クリックでページがスクロールしなくなる以外の挙動変更なし。セル自体をビューポート内に持ってくる必要がある場合は既存の `scrollToCell` で明示的に行う想定。
 
 **採用時の comparison-grid 側の対応**: なし(peer 下限を修正版へ上げるのみ)。未採用の間の回避策として、`ComparisonPane` の `onPointerDownCapture` で同じ先行フォーカスを入れることができます(上記検証と同じ手法。内部クラス `.ssg-shell` に依存するため、採用後に外す前提)。
+
+---
+
+## 10. 行ホバーの controlled 化(`hoveredRowIndex` / `onHoveredRowChange`)(2026-09-11 追記・v0.32.0 で確認)
+
+**背景**: comparison-grid の左右整列モード(`alignRows`。プレースホルダ行を挿入して「左右の同じ行位置 = 同じ突き合わせ相手」にする)で、**片側の行をホバーしたとき、もう片側の同じ行位置も同時にハイライトしたい**(2 ペイン / N 構成ペインとも)。行数が多いと視線が左右で迷うため、ホバー同期があると対応行の照合が楽になる。comparison-grid ではオプション(既定 OFF)として提供する予定。
+
+**現状**: 行ホバーは `SpreadsheetGrid.tsx` 内部の `useState`(`hoveredRowIndex` / `setHoveredRowIndex`、約 626 行)で、`useGridPointerInteractions.ts` がセル `pointerenter`(約 663 行)/ 行ヘッダー `pointerenter`(約 851 行)で設定し、列ヘッダー `pointerenter`(約 944 行)/ 行ヘッダー `pointerleave`(`SpreadsheetGrid.tsx` 約 3196 行)/ grid 本体 `onPointerLeave`(約 6238 行)でクリアする。値は `GridBodyLayer` へ `hoveredRowIndex` として渡り、各行で `isRowHovered = hoveredRowIndex === rowIndex` を評価して `.ssg-body-cell--row-hovered` / `.ssg-header-cell--hovered` を付ける。**外部からホバー行を読む手段(イベント)も、書く手段(controlled prop)も無い**。`enableRowHover` は ON / OFF のみ。
+
+**利用側だけで実現する場合の回り道**(採用されない場合の comparison-grid 側の代替案): ペインのラッパー DOM で `pointermove` を拾い、`closest('[data-row-index]')` からビュー行 index を得て相手ペインへ伝え、相手ペインは `getRowClassName` で独自クラス(`cmpg-row-hover-synced`)を付ける。動作はするが、(a) 内部 DOM 属性 `data-row-index` への依存、(b) 相手ペインの `getRowClassName` の同一性がホバーのたびに変わり、行 memo が全行分破れて再レンダーが増える、(c) 本体ホバー(`.ssg-body-cell--row-hovered`)と同期ホバーで CSS を二重に持つ、という難点がある。
+
+**提案**: 行ホバーを「controlled にもできる」prop 対にする(既存の `activeCell` 等と同じ流儀の *optionally controlled*)。
+
+```ts
+// SpreadsheetGridProps<T> への追加(すべて任意)
+/** 行ホバーの controlled 値(ビュー行 index / null = ホバーなし)。
+ *  指定時は内部 state を使わず、この値でハイライトする(pointer 由来の変化は onHoveredRowChange で通知のみ)。 */
+hoveredRowIndex?: number | null;
+/** 行ホバーが変わったときの通知(uncontrolled でも呼ばれる)。
+ *  viewRowIndex はフィルター / ソート適用後のビュー行 index。source は将来の拡張用(現状 'pointer' のみ)。 */
+onHoveredRowChange?: (viewRowIndex: number | null, ctx: { source: 'pointer' }) => void;
+```
+
+- 内部実装は `useState` を「`hoveredRowIndex` prop があればそれ、無ければ内部 state」に置き換えるだけ(`setHoveredRowIndex` の各呼び出し箇所で `onHoveredRowChange` も呼ぶ)。`GridBodyLayer` 以降は無変更。
+- 通知は同値なら発火しない(pointerenter は 1 行内でセルを跨ぐたびに来るため、`current === next` は抑止する)。既存の `setHoveredRowIndex((current) => (current === rowIndex ? null : current))`(行ヘッダー leave)も同じ規則で通知する。
+- `enableRowHover: false` のときは controlled 値も無視(ハイライトしない / 通知しない)。「通知だけ欲しい」ケースは想定しないため単純な方が良い。
+- ハンドル(`SpreadsheetGridHandle`)には載せない(state を prop で表現できるため。「prop で表現できない一発操作だけを載せる」方針に従う)。
+
+**影響範囲 / 後方互換**: 追加のみ。prop 未指定時は現状と完全同一。`GridState`(getState / applyState)には含めない(一時的な UI 状態のため)。
+
+**採用時の comparison-grid 側の対応**: `useComparisonScrollSyncGroup` と同じ registry 方式で `useComparisonHoverSync`(2-way)/ N 構成版を追加し、各ペインの `gridProps` に `hoveredRowIndex`(グループの共有 state)と `onHoveredRowChange`(broadcast)を流す。`ComparisonView` / `ComparisonLayout.Root` には `enableHoverSync?: boolean`(既定 false・整列モードでのみ意味がある)を追加。CSS は本体の `.ssg-body-cell--row-hovered` がそのまま付くため、既存の `--cmpg-*-row-hover-bg` トークンが相手ペインでも効く(追加 CSS 不要)。
+
+---
+
+## 11. コピー / エクスポートの行フィルタ(`isRowExportable`)(2026-09-11 追記・v0.32.0 で確認)
+
+**背景**: comparison-grid の左右整列モードでは、欠損側に**プレースホルダ行**(既定 `{}`、`.cmpg-row-placeholder` でグレー表示)を挿入して行位置を揃えている。この行は表示上の詰め物だが、グリッドから見ると通常の行なので、**左上コーナーの全選択 → Ctrl+C**、**列ヘッダー選択 → Ctrl+C**、**行ヘッダー範囲選択 → Ctrl+C** のいずれでも**空行として TSV に混じる**。片側だけを Excel に貼る用途では空行が混じって行数がずれるため、「プレースホルダ行を除いてコピーする」オプション(既定 OFF。左右を横に並べて貼る用途では空行がある方が対応関係が保たれるため)を comparison-grid で提供したい。
+
+**現状**: コピー経路は `useGridKeyboardInteractions.ts`(約 126 行)の Ctrl/⌘+C → `useGridClipboardController.ts` の `handleCopy`(約 107 行)の 1 本で、`isWholeGridSelected`(全セル範囲の `cell` 選択として表現)なら `serializeWholeGridToTsv`(約 80 行)、それ以外は `utils/clipboard.ts` の `serializeSelectionToTsv`(`cell` / `row` / `col` の 3 分岐)。いずれも `getRow(viewIndex)` で行を引き、`getCellValue` → `formatClipboardValue ?? String(value ?? '')` で整形して `'\t'` / `'\n'` 結合する。行を除外するフックは無く、あるのは**列単位**の `formatClipboardValue` のみ。CSV(`buildCsv` → `serializeRowsToCsv`)と `getExportData`(`buildGridExportData`)も `resolveExportScope` で行レンジ `[startRow, endRow)` を解決して同じ整形規則で書き出すため、同様に除外できない。コンテキストメニューの既定項目にコピーは無い(Ctrl+C のみ)。
+
+**利用側だけで実現する場合の回り道**(採用されない場合の comparison-grid 側の代替案): ラッパー DOM の capture 段階 `keydown` で Ctrl/⌘+C を横取りして `stopPropagation` し、`handle.getSelection()` の範囲から `rows[viewIndex]` を引いて除外し、自前で TSV を組み立てて `navigator.clipboard` へ書く。難点は、(a) `getCellValue` / `formatClipboardValue` / `'\t'` 結合 / `writeTextToClipboard` の二段フォールバックといった**コピー整形の二重実装**(本体の規則変更に追随が必要)、(b) `getSelection()` はビュー index だが、行オブジェクトを引く公開 API が無いためソート / フィルター有効時に `rows[viewIndex]` が別の行を指す(整列モードではどちらも無効が前提なので実用上は動くが、契約としては脆い)、(c) CSV / `getExportData` は別途対応が要る。
+
+**提案**: 「行をコピー / エクスポート対象にするか」を返す述語 prop を 1 つ追加し、**コピー(TSV)/ CSV / getExportData の 3 経路で共通に**適用する。
+
+```ts
+// SpreadsheetGridProps<T> への追加(任意)
+/** コピー(Ctrl+C の TSV)/ exportCsv / getExportData の対象行フィルタ。false を返した行は出力から除く。
+ *  ctx.viewRowIndex はフィルター / ソート適用後のビュー行 index。既定は全行 true。 */
+isRowExportable?: (row: T, ctx: { viewRowIndex: number; rowKey: GridRowKey }) => boolean;
+```
+
+- 名前は `isRowExportable`(コピーも「クリップボードへのエクスポート」と見なす)。`isRowCopyable` + `isRowExportable` の 2 つに分ける案もあるが、comparison-grid の用途では常に同じ述語を渡すため 1 つで足りる(必要になれば `CsvExportOptions` / `GridExportOptions` 側に上書きを足せる)。
+- 適用箇所は `serializeWholeGridToTsv` / `serializeSelectionToTsv`(3 分岐)/ `serializeRowsToCsv` / `buildGridExportData` の各行ループ。既に `if (!row) continue;`(SSRM 未ロード行の skip)があるので、その直後に `if (isRowExportable && !isRowExportable(row, ctx)) continue;` を足す形。
+- 除外は**行単位のみ**(セル範囲選択で範囲内にプレースホルダ行があれば、その行を丸ごと落とす。列は触らない)。貼り付け(`handlePaste`)は対象外。
+- 代替案: 行述語ではなく `transformCopyMatrix?: (matrix: string[][], ctx) => string[][]` のような後処理フックにすると汎用性は上がるが、CSV / getExportData(セルは `{ value, text }`)と型が揃わず、利用側が「どの行がプレースホルダか」を matrix から判別できない(空行 = プレースホルダとは限らない)ため、行述語の方を推す。
+
+**影響範囲 / 後方互換**: 追加のみ。prop 未指定時は現状と完全同一。`isWholeGridSelected` の判定(選択範囲が全域か)には影響しない(除外は出力時のみ)。
+
+**採用時の comparison-grid 側の対応**: `useComparisonPane` の `gridProps` 合成で `isRowExportable: (row) => !placeholderRows.has(row)` を(利用側の `isRowExportable` があれば AND で)流す。オプションは `excludePlaceholderRowsOnCopy?: boolean`(既定 false)を `useComparisonPane` / `ComparisonView` / `ComparisonLayout.Root` に追加。comparison-grid 自身の `getExportData` 相当(`logic/exportData.ts`)も同じオプションでプレースホルダ行を除外して整合させる。
 
 ---
 
