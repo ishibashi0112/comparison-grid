@@ -478,6 +478,10 @@ export type ComparisonViewProps<T extends object> = ComparisonHighlightOptions &
      *  (縦並びでは列が上下に揃うため横も合わせる)。source が 'user' のスクロールだけを相手ペインへ
      *  伝え、'api' 由来は無視してループを防ぎます。 */
     enableScrollSync?: boolean;
+    /** 横(left)のスクロールも同期するか。未指定は layout 依存('vertical' のみ true)。true で横並びでも横同期、
+     *  false で縦並びでも縦のみ。両ペインの列構成 / 列幅が同じときに意味がある(enableColumnResize で片側だけ
+     *  列幅を変えると横位置はずれて見える)。enableScrollSync が false なら無関係。 */
+    enableHorizontalScrollSync?: boolean;
     /** 片側の行ホバーを相手ペインの同じ行位置にも表示する(既定 false)。alignRows(同じ行位置 = 同じ突き合わせ相手)
      *  との併用が前提で、非整列では行位置が対応しない。spreadsheet-grid v0.33.0 の controlled 行ホバーに乗るため、
      *  `enableRowHover: false` を gridProps に渡すと無効。 */
@@ -918,6 +922,9 @@ export type ComparisonLayoutRootProps<T extends object> = ComparisonHighlightOpt
     layout?: ComparisonViewLayout;
     /** 全ペインのスクロールを同期する(既定 false)。同期軸は layout に依る(横並び = 縦のみ / 縦並び = 縦横)。 */
     enableScrollSync?: boolean;
+    /** 横(left)のスクロールも同期するか。未指定は layout 依存('vertical' のみ true)。true で横並びでも横同期。
+     *  scrollSyncGroup を渡した場合は無視される(グループ自身の syncHorizontal が使われる)。 */
+    enableHorizontalScrollSync?: boolean;
     /** 同期グループを外から渡す(useMultiComparisonNavigation の getHandle と共有するとき等)。
      *  渡した場合 enableScrollSync / layout による軸設定は無視され、グループ自身の設定が使われる。 */
     scrollSyncGroup?: ComparisonScrollSyncGroup<T>;

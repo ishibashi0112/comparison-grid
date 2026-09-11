@@ -3,7 +3,8 @@
 //   - layout='horizontal'(既定)は左右 2 カラム、'vertical' は上下 2 行(left が上)。
 //   - ヘッダースロットは片側だけ指定されても両ペインに描画し、上端を揃えます。
 //   - enableScrollSync の実体は Root の同期グループ(useComparisonScrollSyncGroup)で、同期軸は layout に依り、
-//     横並びは top のみ、縦並びは top / left 両方(列が上下に揃うため横も合わせる)。
+//     横並びは top のみ、縦並びは top / left 両方(列が上下に揃うため横も合わせる)。enableHorizontalScrollSync で
+//     横軸を明示できる(true = 横並びでも横同期 / false = 縦並びでも縦のみ)。
 import type { ComparisonViewProps } from '../model/types';
 import {
   ComparisonLayoutGrid,
@@ -47,6 +48,7 @@ export function ComparisonView<T extends object>(props: ComparisonViewProps<T>) 
     enableKeyCellHighlight,
     enableFieldCellHighlight,
     enableScrollSync = false,
+    enableHorizontalScrollSync,
     enableHoverSync = false,
     showDiffLabelColumn,
     diffLabelColumn,
@@ -61,6 +63,7 @@ export function ComparisonView<T extends object>(props: ComparisonViewProps<T>) 
       keyColumnKeys={keyColumnKeys}
       layout={layout}
       enableScrollSync={enableScrollSync}
+      enableHorizontalScrollSync={enableHorizontalScrollSync}
       enableHoverSync={enableHoverSync}
       gridProps={gridProps}
       className={className}

@@ -218,6 +218,8 @@ function TreeComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cvdColors:
   const [isReprItemMode, setIsReprItemMode] = useState(false);
   const [alignRows, setAlignRows] = useState(false);
   const [syncScroll, setSyncScroll] = useState(false);
+  // 横スクロールも同期するか(横並びでは既定 OFF。縦並びでは既定 ON なのでトグルは横並び時のみ意味がある)。
+  const [syncHorizontalScroll, setSyncHorizontalScroll] = useState(false);
   const [syncHover, setSyncHover] = useState(false);
   const [verticalLayout, setVerticalLayout] = useState(false);
   // 左右整列時のプレースホルダ行をコピー / エクスポートから除く(spreadsheet-grid 0.33.0 の isRowExportable)。
@@ -410,6 +412,15 @@ function TreeComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cvdColors:
             />
             スクロール同期
           </label>
+          <label className="demo-toggle" title="横並びでも横スクロールを同期する(縦並びでは常に同期)">
+            <input
+              type="checkbox"
+              checked={verticalLayout || syncHorizontalScroll}
+              disabled={!syncScroll || verticalLayout}
+              onChange={(event) => setSyncHorizontalScroll(event.target.checked)}
+            />
+            横も同期
+          </label>
           <label className="demo-toggle" title="片側の行ホバーを相手ペインの同じ行位置にも表示(左右整列時)">
             <input
               type="checkbox"
@@ -503,6 +514,7 @@ function TreeComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cvdColors:
           diffLabelColumn={{ title: '変更箇所', width: 130 }}
           layout={verticalLayout ? 'vertical' : 'horizontal'}
           enableScrollSync={syncScroll}
+          enableHorizontalScrollSync={verticalLayout || syncHorizontalScroll}
           enableHoverSync={alignRows && syncHover}
           excludePlaceholderRowsOnCopy={excludePlaceholderCopy}
           leftHeader={<PaneHeader info={toRootItemInfo(leftRows)} />}

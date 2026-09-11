@@ -63,6 +63,7 @@ export function ComparisonLayoutRoot<T extends object>(props: ComparisonLayoutRo
     keyColumnKeys,
     layout = 'horizontal',
     enableScrollSync = false,
+    enableHorizontalScrollSync,
     scrollSyncGroup,
     enableHoverSync = false,
     hoverSyncGroup,
@@ -101,9 +102,10 @@ export function ComparisonLayoutRoot<T extends object>(props: ComparisonLayoutRo
   );
   const compareFields = comparison.compareFields;
 
+  // 同期軸: 横は明示指定があればそれ、無ければ layout 依存(縦並びは列が上下に揃うため横も合わせる)。
   const ownGroup = useComparisonScrollSyncGroup<T>({
     enabled: enableScrollSync,
-    syncHorizontal: layout === 'vertical',
+    syncHorizontal: enableHorizontalScrollSync ?? layout === 'vertical',
   });
   const group = scrollSyncGroup ?? ownGroup;
   const ownHoverGroup = useComparisonHoverSyncGroup({ enabled: enableHoverSync });

@@ -77,6 +77,7 @@ export function MultiComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cv
   const [showDiffOnly, setShowDiffOnly] = useState(false);
   const [alignRows, setAlignRows] = useState(false);
   const [syncScroll, setSyncScroll] = useState(true);
+  const [syncHorizontalScroll, setSyncHorizontalScroll] = useState(false);
   const [syncHover, setSyncHover] = useState(false);
   const [verticalLayout, setVerticalLayout] = useState(false);
   const [excludePlaceholderCopy, setExcludePlaceholderCopy] = useState(false);
@@ -106,7 +107,7 @@ export function MultiComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cv
   // 3. スクロール同期グループは外で作り、Root と差分ジャンプで共有する(Grid がハンドルを登録してくれる)。
   const group = useComparisonScrollSyncGroup<BomRow>({
     enabled: syncScroll,
-    syncHorizontal: verticalLayout,
+    syncHorizontal: verticalLayout || syncHorizontalScroll,
   });
   const navigation = useMultiComparisonNavigation<BomRow>({
     comparison,
@@ -256,6 +257,15 @@ export function MultiComparisonDemo({ theme, cvdColors }: { theme: GridTheme; cv
               onChange={(event) => setSyncScroll(event.target.checked)}
             />
             スクロール同期
+          </label>
+          <label className="demo-toggle" title="横並びでも横スクロールを同期する(縦並びでは常に同期)">
+            <input
+              type="checkbox"
+              checked={verticalLayout || syncHorizontalScroll}
+              disabled={!syncScroll || verticalLayout}
+              onChange={(event) => setSyncHorizontalScroll(event.target.checked)}
+            />
+            横も同期
           </label>
           <label className="demo-toggle" title="ある構成の行ホバーを他の構成の同じ行位置にも表示(整列時)">
             <input

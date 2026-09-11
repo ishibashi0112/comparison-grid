@@ -595,6 +595,7 @@ const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows 
 | `columns` / `keyColumnKeys` | `GridColumn<T>[]` / `string[]` | | `ComparisonView` と同じ。 |
 | `layout` | `'horizontal' \| 'vertical'` | `'horizontal'` | 横並びは**子の数だけ等幅カラム**(`grid-auto-flow: column`)、縦並びは 1 カラムに積む。 |
 | `enableScrollSync` | `boolean` | `false` | 全ペインのスクロール同期(軸は layout に依る)。Root が `useComparisonScrollSyncGroup` を生成する。 |
+| `enableHorizontalScrollSync` | `boolean` | layout 依存(`'vertical'` のみ `true`) | 横のスクロールも同期するか(`ComparisonView` と同じ)。`scrollSyncGroup` を渡した場合は無視される(グループ自身の `syncHorizontal` が使われる)。 |
 | `scrollSyncGroup` | `ComparisonScrollSyncGroup<T>` | — | 外で作ったグループを注入(`useMultiComparisonNavigation({ getHandle: group.getHandle })` と共有するとき)。渡すと `enableScrollSync` / layout の軸設定は無視され、グループ自身の設定が使われる。 |
 | `enableHoverSync` | `boolean` | `false` | 全ペインの行ホバーを同じ行位置で同期する(`alignRows` との併用が前提。上記「ホバー同期」)。Root が `useComparisonHoverSyncGroup` を生成する。 |
 | `hoverSyncGroup` | `ComparisonHoverSyncGroup` | — | 外で作ったホバー同期グループを注入(自作 UI でホバー行を読む / 動かすとき)。渡すと `enableHoverSync` は無視される。 |
@@ -630,6 +631,7 @@ const multi = useMultiComparison({ sides, getMatchKey, compareFields, alignRows 
 | `enableFieldCellHighlight` | `boolean` | `true` | `compareFields` 対応列のセル強調。 |
 | `excludePlaceholderRowsOnCopy` | `boolean` | `false` | `alignRows` のプレースホルダ行(グレーの空行)を、グリッドの**コピー**(`Ctrl/⌘+C` の TSV。左上コーナーの全選択 / 列選択 / 行選択いずれも)/ `exportCsv` / `getExportData` の出力から行ごと除く。片側だけを Excel 等へ貼るときに空行が混じらないようにする用途。左右を横に並べて貼りたい(行位置を保ちたい)ときは既定の `false` のまま。実体は spreadsheet-grid v0.33.0 の `isRowExportable` で、利用側の `gridProps.isRowExportable` とは AND で合成される。`useComparisonPane` / `ComparisonPane` / `ComparisonLayout.Root` でも同名。 |
 | `enableScrollSync` | `boolean` | `false` | 両ペインのスクロールを同期する(`alignRows` との併用を想定)。同期する軸は `layout` に依る: `'horizontal'` は**縦**(top)のみ(横は同期しない)、`'vertical'` は**縦横**(top / left)両方(縦並びでは列が上下に揃うため横も合わせる)。`source: 'user'` のスクロールだけ相手の `setScrollPosition()` へ伝え、`'api'` 由来は無視してループを防ぐ(spreadsheet-grid v0.29.0 のスクロール API)。利用側の `ref` / `onScroll`(`gridProps` / 片側 props)はそのまま透過・合成される。 |
+| `enableHorizontalScrollSync` | `boolean` | layout 依存(`'vertical'` のみ `true`) | 横(`left`)のスクロールも同期するか。`true` で横並びでも横同期、`false` で縦並びでも縦のみ。両ペインの列構成 / 列幅が同じときに意味がある(`enableColumnResize` で片側だけ列幅を変えると横位置はずれて見える)。`enableScrollSync` が `false` なら無関係。headless では `useComparisonScrollSync({ syncHorizontal })`。 |
 | `enableHoverSync` | `boolean` | `false` | 片側の行ホバーを相手ペインの同じ行位置にも表示する(`alignRows` との併用が前提。非整列では行位置が対応しない)。実体は spreadsheet-grid v0.33.0 の controlled 行ホバーで、`gridProps` の `enableRowHover: false` では無効。headless 版は `useComparisonHoverSync`。 |
 | `className` / `style` | `string` / `CSSProperties` | — | ルート(`.cmpg-view`)へ。 |
 
